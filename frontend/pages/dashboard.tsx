@@ -1,157 +1,65 @@
+import Link from 'next/link'
 import ProtectedLayout from '../components/layout/ProtectedLayout'
-import { useAuth } from '../contexts/AuthContext'
-
-interface StudyStats {
-  wordsLearned: number
-  accuracy: number
-  daysStreak: number
-  nextReview: Date
+import { useLearningState } from '../hooks/useLearningState'
+const skills: Record<string, { label: string; href: string }> = {
+  vocabulary: { label: 'Từ vựng', href: '/dictionary' }, kanji: { label: 'Kanji', href: '/kanji' },
+  grammar: { label: 'Ngữ pháp', href: '/grammar' }, reading: { label: 'Đọc hiểu', href: '/reading' },
+  listening: { label: 'Nghe hiểu', href: '/listening' },
 }
-
-export default function DashboardPage() {
-  const { user } = useAuth()
-
-  const stats: StudyStats = {
-    wordsLearned: 150,
-    accuracy: 85,
-    daysStreak: 7,
-    nextReview: new Date(),
-  }
-
-  return (
-    <ProtectedLayout>
-      <div className="space-y-6">
-        <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Welcome back!</h1>
-        
-        <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Stats cards */}
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-                  </svg>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Words Learned</dt>
-                    <dd className="flex items-baseline">
-                      <div className="text-2xl font-semibold text-gray-900 dark:text-white">
-                        {stats.wordsLearned}
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                  </svg>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Accuracy</dt>
-                    <dd className="flex items-baseline">
-                      <div className="text-2xl font-semibold text-gray-900 dark:text-white">
-                        {stats.accuracy}%
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" />
-                  </svg>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Days Streak</dt>
-                    <dd className="flex items-baseline">
-                      <div className="text-2xl font-semibold text-gray-900 dark:text-white">
-                        {stats.daysStreak}
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-white dark:bg-gray-800 overflow-hidden shadow rounded-lg">
-            <div className="p-5">
-              <div className="flex items-center">
-                <div className="flex-shrink-0">
-                  <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div className="ml-5 w-0 flex-1">
-                  <dl>
-                    <dt className="text-sm font-medium text-gray-500 dark:text-gray-400 truncate">Next Review</dt>
-                    <dd className="flex items-baseline">
-                      <div className="text-2xl font-semibold text-gray-900 dark:text-white">
-                        {stats.nextReview.toLocaleTimeString()}
-                      </div>
-                    </dd>
-                  </dl>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick Actions */}
-        <div className="mt-8">
-          <h2 className="text-lg font-medium text-gray-900 dark:text-white">Quick Actions</h2>
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
-            <a
-              href="/vocabulary"
-              className="relative rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500"
-            >
-              <div className="flex-shrink-0">
-                <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <span className="absolute inset-0" aria-hidden="true" />
-                <p className="text-sm font-medium text-gray-900 dark:text-white">Browse Vocabulary</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Search and study new words</p>
-              </div>
-            </a>
-
-            <a
-              href="/study"
-              className="relative rounded-lg border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 px-6 py-5 shadow-sm flex items-center space-x-3 hover:border-gray-400 focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-indigo-500"
-            >
-              <div className="flex-shrink-0">
-                <svg className="h-6 w-6 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                </svg>
-              </div>
-              <div className="flex-1 min-w-0">
-                <span className="absolute inset-0" aria-hidden="true" />
-                <p className="text-sm font-medium text-gray-900 dark:text-white">Start Study Session</p>
-                <p className="text-sm text-gray-500 dark:text-gray-400">Practice your vocabulary</p>
-              </div>
-            </a>
-          </div>
-        </div>
+function Dashboard() {
+  const { data, loading, error, refresh } = useLearningState()
+  if (loading && !data) return <p className="notice" role="status">Đang tải tiến độ học…</p>
+  if (!data) return <div className="notice" role="alert">{error || 'Chưa tải được tiến độ.'} <button className="btn" type="button" onClick={() => void refresh()}>Thử lại</button></div>
+  const { stats, preferences } = data
+  const remaining = Math.max(0, preferences.dailyMinutes - stats.minutesToday)
+  const progress = Math.min(100, Math.round(stats.minutesToday / preferences.dailyMinutes * 100))
+  const exams = [...data.exams].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  const latest = exams[0]
+  const analyses = latest ? Object.entries(latest.bySkill).filter(([, result]) => result.total > 0)
+    .map(([skill, result]) => ({ skill, ...result, percent: Math.round(result.correct / result.total * 100) })) : []
+  const weakest = [...analyses].sort((a, b) => a.percent - b.percent)[0]
+  const activities = [...data.activities].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+  const nextDue = data.cards.map(card => new Date(card.dueAt).getTime()).filter(Number.isFinite).sort((a, b) => a - b)[0]
+  const counters = [['Thẻ đã lưu', stats.cards], ['Đến hạn', stats.due], ['Đã ghi nhớ', stats.mastered], ['Chuỗi ngày học', stats.streak]]
+  return <div className="space-y-6">
+    <div className="flex flex-wrap items-center justify-between gap-3"><div><h1 className="page-heading">Việc học của bạn</h1><p className="muted mt-2">Trình độ đã chọn {preferences.level} · Mục tiêu {preferences.targetLevel}</p></div>
+      <button className="btn" type="button" disabled={loading} onClick={() => void refresh()}>{loading ? 'Đang cập nhật…' : 'Cập nhật tiến độ'}</button></div>
+    {error && <p className="notice" role="alert">{error}</p>}
+    <dl className="grid grid-cols-2 gap-3 lg:grid-cols-4">{counters.map(([label, value]) => <div className="panel" key={label}><dt className="muted">{label}</dt><dd className="text-xl sm:text-2xl font-semibold tabular-nums mt-2">{value}</dd></div>)}</dl>
+    <section className="panel space-y-4">
+      <div className="flex flex-wrap justify-between items-center gap-3"><h2 className="text-lg font-semibold">Mục tiêu hôm nay</h2><Link className="text-link" href="/settings">Chỉnh mục tiêu</Link></div>
+      <p className="tabular-nums">{stats.minutesToday} / {preferences.dailyMinutes} phút đã ghi nhận · {remaining ? `Còn ${remaining} phút` : 'Đã đạt mục tiêu thời gian'}</p>
+      <progress className="w-full h-3 accent-indigo-600" max={100} value={progress} aria-label="Tiến độ mục tiêu thời gian hôm nay" />
+      <p className="muted">Thời gian là hoạt động đã được máy chủ ghi nhận; ôn thẻ được theo dõi riêng, không quy đổi thành phút giả.</p>
+      <div className="flex flex-wrap gap-3">
+        <Link className="btn btn-primary" href={stats.due > 0 ? '/study' : '/dictionary'}>{stats.due > 0 ? `Ôn ${stats.due} thẻ đến hạn` : 'Tra và lưu từ mới'}</Link>
+        <Link className="btn" href={weakest ? skills[weakest.skill]?.href || '/jlpt' : '/jlpt'}>{weakest ? `Luyện thêm ${skills[weakest.skill]?.label || weakest.skill}` : 'Làm bài luyện để xem kỹ năng'}</Link>
       </div>
-    </ProtectedLayout>
-  )
+      {nextDue !== undefined && <p className="muted">Hạn ôn sớm nhất: {new Date(nextDue).toLocaleString('vi-VN')}.</p>}
+    </section>
+    <section className="panel space-y-4">
+      <h2 className="text-lg font-semibold">Kỹ năng từ bài luyện gần nhất</h2>
+      {latest && analyses.length ? <>
+        <p className="muted">Bài {latest.level} ngày {new Date(latest.createdAt).toLocaleDateString('vi-VN')}. Phân tích chỉ phản ánh bộ câu hỏi đã làm.</p>
+        <div className="space-y-4">{analyses.map(result => <div key={result.skill}><p className="flex justify-between gap-3"><span>{skills[result.skill]?.label || result.skill}</span><span className="tabular-nums">{result.correct}/{result.total} · {result.percent}%</span></p>
+          <progress className="w-full h-2 accent-indigo-600" max={result.total} value={result.correct} aria-label={`Kết quả ${skills[result.skill]?.label || result.skill}`} /></div>)}</div>
+        {weakest && <p>Gợi ý từ kết quả thực tế: ưu tiên {skills[weakest.skill]?.label || weakest.skill} ({weakest.correct}/{weakest.total} câu đúng). Đây không phải đánh giá trình độ JLPT chính thức.</p>}
+      </> : <p className="muted">Chưa có bài luyện đủ dữ liệu phân tích. <Link className="text-link" href="/jlpt">Làm bài luyện khởi đầu</Link>.</p>}
+      {data.exams.some(exam => exam.total > 0) && <p className="muted">Độ chính xác bài luyện theo máy chủ: {stats.accuracy}%.</p>}
+    </section>
+    <div className="grid gap-3 lg:grid-cols-2">
+      <section className="panel space-y-4"><h2 className="text-lg font-semibold">Hoạt động gần đây</h2>
+        {activities.length ? <ul className="space-y-3">{activities.slice(0, 8).map((activity, i) => <li key={`${activity.createdAt}:${i}`} className="space-y-1"><p>{skills[activity.kind]?.label || activity.kind} · {activity.completed ? 'Đã hoàn thành' : 'Đang học'} · {activity.minutes} phút</p>
+          <p className="muted text-xs">{activity.itemId} · {new Date(activity.createdAt).toLocaleString('vi-VN')}</p></li>)}</ul> : <p className="muted">Chưa có hoạt động được lưu. Học một bài để bắt đầu theo dõi.</p>}
+      </section>
+      <section className="panel space-y-4"><h2 className="text-lg font-semibold">Lịch sử luyện JLPT</h2>
+        {exams.length ? <ul className="space-y-3">{exams.slice(0, 5).map(exam => <li key={exam.id} className="flex flex-wrap justify-between gap-2"><span>{exam.level} · {new Date(exam.createdAt).toLocaleString('vi-VN')}</span><span className="tabular-nums">{exam.score}/{exam.total} câu đúng</span></li>)}</ul> : <p className="muted">Chưa có bài luyện đã nộp.</p>}
+        <Link className="text-link" href="/jlpt">Mở luyện JLPT</Link>
+      </section>
+    </div>
+    <section className="panel space-y-3"><h2 className="text-lg font-semibold">Từ đã tra gần đây</h2>
+      {data.history.length ? <ul className="flex flex-wrap gap-3">{data.history.slice(0, 8).map((query, i) => <li key={i}><Link className="text-link" href={{ pathname: '/dictionary', query: { q: query } }}>{query}</Link></li>)}</ul> : <p className="muted">Lịch sử xuất hiện khi bạn bấm “Tra từ” trong từ điển.</p>}
+    </section>
+  </div>
 }
+export default function DashboardPage() { return <ProtectedLayout><Dashboard /></ProtectedLayout> }
