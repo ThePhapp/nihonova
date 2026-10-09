@@ -1,44 +1,32 @@
-import { ReactNode } from 'react'
+import { ReactNode, useState } from 'react'
+import Link from 'next/link'
+import { useRouter } from 'next/router'
 import Navbar from './Navbar'
-import { useTheme } from '../../contexts/ThemeContext'
-
-interface LayoutProps {
-  children: ReactNode
-}
-
-export default function Layout({ children }: LayoutProps) {
-  const { theme, toggleTheme } = useTheme()
-
-  return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <Navbar />
-      <main className="max-w-7xl mx-auto py-6 sm:px-6 lg:px-8">
+import { useAuth } from '../../contexts/AuthContext'
+const routes = [
+  ['/dashboard', 'Tổng quan'], ['/dictionary', 'Từ điển'], ['/study', 'Ôn tập'],
+  ['/kanji', 'Kanji'], ['/grammar', 'Ngữ pháp'], ['/jlpt', 'Luyện JLPT'],
+  ['/reading', 'Đọc hiểu'], ['/listening', 'Nghe hiểu'], ['/tutor', 'Trợ lý'], ['/settings', 'Cài đặt'],
+]
+export default function Layout({ children }: { children: ReactNode }) {
+  const router = useRouter()
+  const { sessionError, restoreSession } = useAuth()
+  const [open, setOpen] = useState(false)
+  const navigation = routes.map(([href, label]) => <Link key={href} href={href}
+    aria-current={router.pathname === href ? 'page' : undefined}
+    className={router.pathname === href ? 'nav-link nav-active' : 'nav-link'} onClick={() => setOpen(false)}>{label}</Link>)
+  return <div className="app-shell">
+    <a href="#main-content" className="skip-link">Đến nội dung chính</a>
+    <Navbar />
+    <div className="app-body">
+      <aside className="app-sidebar">
+        <button type="button" className="btn w-full md:hidden" aria-expanded={open} aria-controls="app-nav" onClick={() => setOpen(!open)}>Danh mục học tập {open ? '−' : '+'}</button>
+        <nav id="app-nav" aria-label="Học tiếng Nhật" className={open ? 'nav-list flex' : 'nav-list hidden md:flex'}>{navigation}</nav>
+      </aside>
+      <main id="main-content" className="app-main" tabIndex={-1}>
+        {sessionError && <div className="notice mb-4" role="status">{sessionError} <button type="button" className="btn" onClick={() => void restoreSession()}>Kiểm tra lại phiên</button></div>}
         {children}
       </main>
-      <footer className="bg-white dark:bg-gray-800 shadow-lg mt-8">
-        <div className="max-w-7xl mx-auto py-4 px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center">
-            <p className="text-gray-500 dark:text-gray-400">
-              © 2025 JLPT Study App
-            </p>
-            <button
-              onClick={toggleTheme}
-              className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              title="Toggle dark mode"
-            >
-              {theme === 'dark' ? (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-yellow-500" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
-                </svg>
-              ) : (
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-gray-500" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M17.293 13.293A8 8 0 016.707 2.707a8.001 8.001 0 1010.586 10.586z" />
-                </svg>
-              )}
-            </button>
-          </div>
-        </div>
-      </footer>
     </div>
-  )
+  </div>
 }

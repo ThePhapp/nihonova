@@ -1,41 +1,20 @@
+import { useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/router'
 import Layout from '../components/layout/Layout'
 import { useAuth } from '../contexts/AuthContext'
 import LoginForm from '../components/auth/LoginForm'
-
 export default function LoginPage() {
   const { user } = useAuth()
   const router = useRouter()
-  const { redirect } = router.query
-
-  if (user) {
-    router.push(typeof redirect === 'string' ? redirect : '/')
-    return null
-  }
-
-  return (
-    <Layout>
-      <div className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-md w-full space-y-8">
-          <div>
-            <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
-              Đăng nhập
-            </h2>
-            <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
-              Hoặc{' '}
-              <a href="/register" className="font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400">
-                đăng ký tài khoản mới
-              </a>
-            </p>
-          </div>
-          <LoginForm 
-            onSuccess={() => {
-              const redirectPath = typeof redirect === 'string' ? redirect : '/'
-              router.push(redirectPath)
-            }}
-          />
-        </div>
-      </div>
-    </Layout>
-  )
+  const redirect = router.query.redirect
+  const destination = typeof redirect === 'string' && redirect.startsWith('/') && !redirect.startsWith('//') && !redirect.includes('\\') && !redirect.startsWith('/login') && !redirect.startsWith('/register') ? redirect : '/dashboard'
+  useEffect(() => { if (user) void router.replace(destination) }, [user, router, destination])
+  return <Layout><section className="mx-auto max-w-md space-y-6 py-8">
+    <h1 className="page-heading">Đăng nhập</h1>
+    <p className="muted">Lưu thẻ ôn tập và theo dõi việc học trên tài khoản của bạn.</p>
+    {router.query.registered === '1' && <p className="notice" role="status">Đã tạo tài khoản. Bạn có thể đăng nhập.</p>}
+    <LoginForm onSuccess={() => void router.replace(destination)} />
+    <p>Chưa có tài khoản? <Link className="text-link" href="/register">Đăng ký</Link></p>
+  </section></Layout>
 }
