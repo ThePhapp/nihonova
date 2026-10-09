@@ -1,120 +1,30 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import jwt from 'jsonwebtoken'
-import db from '../db'
-
+import { pool } from '../config/db'
+import { authMiddleware, AuthenticatedRequest, jwtSecret } from '../middleware/auth'
+import { asyncRoute, rateLimit } from '../middleware/http'
+import { credentials, HttpError } from '../services/validation'
 const router = Router()
-
-// Register endpoint
-router.post('/register', async (req, res) => {
-  try {
-    const { email, password } = req.body
-
-    // Validate input
-    if (!email || !password) {
-      return res.status(400).json({ 
-        success: false, 
-        message: 'Email và mật khẩu là bắt buộc' 
-      })
-    }
-
-    // Check if user already exists
-    const userExists = await db.query(
-      'SELECT * FROM users WHERE email = $1',
-      [email]
-    )
-
-    if (userExists.rows.length > 0) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email này đã được đăng ký'
-      })
-    }
-
-    // Hash password
-    const salt = await bcrypt.genSalt(10)
-    const hashedPassword = await bcrypt.hash(password, salt)
-
-    // Create user
-    const result = await db.query(
-      'INSERT INTO users (email, password) VALUES ($1, $2) RETURNING id, email',
-      [email, hashedPassword]
-    )
-
-    const user = result.rows[0]
-
-    res.status(201).json({
-      success: true,
-      message: 'Đăng ký thành công'
-    })
-  } catch (error) {
-    console.error('Registration error:', error)
-    res.status(500).json({ 
-      success: false, 
-      message: 'Đã xảy ra lỗi khi đăng ký' 
-    })
-  }
-})
-
-// Login endpoint
-router.post('/login', async (req, res) => {
-  try {
-    const { email, password } = req.body
-
-    // Validate input
-    if (!email || !password) {
-      return res.status(400).json({
-        success: false,
-        message: 'Email và mật khẩu là bắt buộc'
-      })
-    }
-
-    // Check if user exists
-    const result = await db.query(
-      'SELECT * FROM users WHERE email = $1',
-      [email]
-    )
-
-    if (result.rows.length === 0) {
-      return res.status(401).json({
-        success: false,
-        message: 'Email hoặc mật khẩu không đúng'
-      })
-    }
-
-    const user = result.rows[0]
-
-    // Verify password
-    const isValidPassword = await bcrypt.compare(password, user.password)
-    if (!isValidPassword) {
-      return res.status(401).json({
-        success: false,
-        message: 'Email hoặc mật khẩu không đúng'
-      })
-    }
-
-    // Create JWT token
-    const token = jwt.sign(
-      { id: user.id, email: user.email },
-      process.env.JWT_SECRET || 'your-secret-key',
-      { expiresIn: '24h' }
-    )
-
-    res.json({
-      success: true,
-      token,
-      user: {
-        id: user.id,
-        email: user.email
-      }
-    })
-  } catch (error) {
-    console.error('Login error:', error)
-    res.status(500).json({
-      success: false,
-      message: 'Đã xảy ra lỗi khi đăng nhập'
-    })
-  }
-})
-
+router.post('/register', rateLimit(10), asyncRoute(async (req, res) => {
+  const { email, password } = credentials(req.body)
+  jwtSecret()
+  const hash = await bcrypt.hash(password, 12)
+  await pool.query('INSERT INTO users(email,password) VALUES($1,$2)', [email, hash])
+  res.status(201).json({ success: true })
+}))
+router.post('/login', rateLimit(20), asyncRoute(async (req, res) => {
+  const { email, password } = credentials(req.body)
+  const secret = jwtSecret()
+  const result = await pool.query<{ id: number; email: string; password: string }>('SELECT id,email,password FROM users WHERE lower(btrim(email))=$1', [email])
+  const user = result.rows[0]
+  // Spend the same bcrypt work even for an unknown account.
+  const hash = user?.password || '$2b$12$C6UzMDM.H6dfI/f/IKcEe.5Ih5wSgX2pLZhaQj8uBNBM6eLR1xG9W'
+  const valid = await bcrypt.compare(password, hash)
+  if (!user || !valid) throw new HttpError(401, 'Email or password incorrect')
+  const identity = { id: String(user.id), email: user.email }
+  const token = jwt.sign(identity, secret, { algorithm: 'HS256', expiresIn: '24h' })
+  res.json({ success: true, token, user: identity })
+}))
+router.get('/me', authMiddleware, (req: AuthenticatedRequest, res) => res.json(req.user))
 export default router

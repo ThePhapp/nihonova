@@ -1,7 +1,0 @@
-{
-  "user": "postgres",
-  "password": "1104205",
-  "host": "localhost",
-  "port": 5433,
-  "database": "jlpt_db"
-}
