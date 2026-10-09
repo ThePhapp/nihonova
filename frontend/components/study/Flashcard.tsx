@@ -1,123 +1,49 @@
-import { useState } from 'react'
-import { useSpacedRepetition } from '@/hooks/useSpacedRepetition'
-import { VocabularyWord } from '@/types/vocabulary'
-import AudioButton from '@/components/vocab/AudioButton'
-
-interface FlashcardProps {
-  word: VocabularyWord
-  onNext: () => void
-}
-
-export default function Flashcard({ word, onNext }: Readonly<FlashcardProps>) {
-  const [isFlipped, setIsFlipped] = useState(false)
-  const { updateWordProgress } = useSpacedRepetition()
-
-  const handleKnow = () => {
-    updateWordProgress(word.id, true)
-    onNext()
-    setIsFlipped(false)
+import { FormEvent, useState } from 'react'
+import { Card, Preferences } from '../../types/learning'
+import { acceptsAnswer, choiceWords } from '../../utils/study'
+import EntryCard from '../vocabulary/EntryCard'
+type Mode = 'flashcard' | 'typing' | 'choice'
+export default function Flashcard({ card, cards, preferences, mode, busy, canRate, onRate }: {
+  card: Card; cards: Card[]; preferences: Preferences; mode: Mode; busy: boolean; canRate: boolean
+  onRate: (rating: 0 | 1 | 2 | 3) => void
+}) {
+  const [revealed, setRevealed] = useState(false)
+  const [answer, setAnswer] = useState('')
+  const [feedback, setFeedback] = useState('')
+  const choices = choiceWords(card, cards)
+  function check(value: string) {
+    setAnswer(value)
+    setFeedback(acceptsAnswer(card, value) ? 'Khớp với từ hoặc cách đọc đã lưu.' : 'Chưa khớp. So sánh với đáp án bên dưới rồi tự đánh giá.')
+    setRevealed(true)
   }
-
-  const handleDontKnow = () => {
-    updateWordProgress(word.id, false)
-    onNext()
-    setIsFlipped(false)
-  }
-
-  return (
-    <div className="w-full max-w-lg mx-auto">
-      <div className="aspect-[4/3] relative bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden">
-        {/* Front */}
-        <div 
-          className={`absolute inset-0 p-6 transition-all duration-700 ${
-            isFlipped ? 'opacity-0' : 'opacity-100'
-          }`}
-        >
-          <div className="flex flex-col items-center justify-center h-full">
-            <h2 className="text-4xl mb-4 font-bold text-gray-900 dark:text-white">
-              {word.kanji || word.word}
-            </h2>
-            <p className="text-xl text-gray-600 dark:text-gray-400 mb-4">
-              {word.hiragana}
-            </p>
-            <AudioButton word={word.word} />
-          </div>
-        </div>
-
-        {/* Back */}
-        <div 
-          className={`absolute inset-0 p-6 transition-all duration-700 ${
-            isFlipped ? 'opacity-100' : 'opacity-0'
-          }`}
-        >
-          <div className="h-full overflow-y-auto">
-            {word.meanings.map((meaning, i) => (
-              <div key={`meaning-${word.id}-${i}`} className="mb-4">
-                <div className="text-sm text-gray-500 dark:text-gray-400">
-                  {meaning.type}
-                </div>
-                <div className="text-lg text-gray-900 dark:text-white">
-                  {meaning.definition}
-                </div>
-                {meaning.tags && meaning.tags.length > 0 && (
-                  <div className="mt-1 flex flex-wrap gap-2">
-                    {meaning.tags.map((tag) => (
-                      <span 
-                        key={`tag-${word.id}-${i}-${tag}`}
-                        className="text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-            
-            {word.examples.length > 0 && (
-              <div className="mt-4 border-t border-gray-200 dark:border-gray-700 pt-4">
-                <h3 className="text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">
-                  Ví dụ:
-                </h3>
-                {word.examples.map((example, i) => (
-                  <div key={`example-${word.id}-${i}`} className="mb-3">
-                    <p className="text-lg text-gray-900 dark:text-white">
-                      {example.japanese}
-                    </p>
-                    <p className="text-sm text-gray-600 dark:text-gray-300">
-                      {example.reading}
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {example.meaning}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="mt-6 flex justify-center space-x-4">
-        <button
-          onClick={handleDontKnow}
-          className="px-6 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-        >
-          Không biết
-        </button>
-        <button
-          onClick={() => setIsFlipped(!isFlipped)}
-          className="px-6 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-        >
-          {isFlipped ? 'Ẩn nghĩa' : 'Xem nghĩa'}
-        </button>
-        <button
-          onClick={handleKnow}
-          className="px-6 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-offset-2"
-        >
-          Biết
-        </button>
-      </div>
-    </div>
-  )
+  function submit(event: FormEvent) { event.preventDefault(); check(answer) }
+  return <div className="space-y-4">
+    {!revealed ? <section className="panel space-y-5">
+      {mode === 'flashcard' ? <>
+        <h2 className="text-3xl font-semibold text-center py-6" lang="ja">{card.entry.word}</h2>
+        <p className="muted text-center">Thử nhớ cách đọc và nghĩa trước khi xem đáp án.</p>
+      </> : <>
+        <h2 className="text-base font-semibold">Từ tiếng Nhật nào có nghĩa này?</h2>
+        <p lang={card.entry.meaningLanguage === 'en' ? 'en' : 'vi'}>{card.entry.meanings.join('; ')}</p>
+        <p className="muted">Nghĩa {card.entry.meaningLanguage === 'en' ? 'tiếng Anh' : 'tiếng Việt'} từ thẻ đã lưu.</p>
+        {mode === 'typing' ? <form className="space-y-3" onSubmit={submit}>
+          <label htmlFor="study-answer">Nhập từ hoặc cách đọc tiếng Nhật</label>
+          <input className="field" id="study-answer" lang="ja" maxLength={200} value={answer} onChange={e => setAnswer(e.target.value)} autoComplete="off" />
+          <button className="btn" type="submit" disabled={!answer.trim()}>Kiểm tra đáp án</button>
+        </form> : choices.length ? <div className="grid gap-3 sm:grid-cols-2">{choices.map(word => <button key={word} type="button" className="btn" lang="ja" onClick={() => check(word)}>{word}</button>)}</div> :
+          <p className="notice">Cần thêm một thẻ có nghĩa khác để tạo lựa chọn. Bạn vẫn có thể xem đáp án và tự đánh giá.</p>}
+      </>}
+      <button className="btn btn-primary" type="button" onClick={() => setRevealed(true)}>Xem đáp án</button>
+    </section> : <>
+      {feedback && <p className="notice" role="status">{feedback}{answer && <> Câu trả lời: <span lang="ja">{answer}</span></>}</p>}
+      <EntryCard entry={card.entry} furigana={preferences.furigana} romaji={preferences.romaji} />
+    </>}
+    {canRate ? <fieldset disabled={!revealed || busy} className="space-y-3">
+      <legend className="font-medium">Đánh giá sau khi xem đáp án</legend>
+      <p className="muted">Máy chủ lưu lịch ôn theo đánh giá của bạn. Kiểm tra gõ từ/trắc nghiệm chỉ hỗ trợ tự đánh giá.</p>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {(['Quên (0)', 'Khó (1)', 'Nhớ (2)', 'Dễ (3)'] as const).map((label, i) => <button type="button" className="btn" key={label} onClick={() => onRate(i as 0 | 1 | 2 | 3)}>{busy ? 'Đang lưu…' : label}</button>)}
+      </div>{!revealed && <p className="muted">Mở đáp án để đánh giá thẻ.</p>}
+    </fieldset> : <p className="notice">Thẻ chưa đến hạn; xem trước không làm thay đổi lịch ôn.</p>}
+  </div>
 }
