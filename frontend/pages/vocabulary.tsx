@@ -1,18 +1,1 @@
-import React from 'react'
-import ProtectedLayout from '../components/layout/ProtectedLayout'
-import Mazii from '../components/vocabulary/Mazii'
-
-const VocabularyPage = () => {
-  return (
-    <ProtectedLayout>
-      <div className="space-y-6">
-        <div className="sm:flex sm:items-center sm:justify-between">
-          <h1 className="text-2xl font-semibold text-gray-900 dark:text-white">Vocabulary</h1>
-        </div>
-        <Mazii />
-      </div>
-    </ProtectedLayout>
-  )
-}
-
-export default VocabularyPage
+export { default } from './dictionary'

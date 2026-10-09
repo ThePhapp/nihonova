@@ -1,39 +1,26 @@
-interface AudioButtonProps {
-  word: string
-}
-
-export default function AudioButton({ word }: AudioButtonProps) {
-  const [isPlaying, setIsPlaying] = useState(false)
-
-  const playAudio = async () => {
-    try {
-      setIsPlaying(true)
-      // Using Google Translate TTS as a simple solution
-      const audio = new Audio(`https://translate.google.com/translate_tts?ie=UTF-8&q=${encodeURIComponent(word)}&tl=ja&client=tw-ob`)
-      await audio.play()
-      audio.onended = () => setIsPlaying(false)
-    } catch (error) {
-      console.error('Error playing audio:', error)
-      setIsPlaying(false)
+import { useEffect, useRef, useState } from 'react'
+export default function AudioButton({ word }: { word: string }) {
+  const [message, setMessage] = useState('')
+  const [playing, setPlaying] = useState(false)
+  const utterance = useRef<SpeechSynthesisUtterance | null>(null)
+  useEffect(() => () => {
+    if (utterance.current && 'speechSynthesis' in window) window.speechSynthesis.cancel()
+  }, [])
+  function speak() {
+    if (!('speechSynthesis' in window) || !('SpeechSynthesisUtterance' in window)) {
+      setMessage('Trình duyệt không hỗ trợ đọc tiếng Nhật.'); return
     }
+    const voice = window.speechSynthesis.getVoices().find(v => v.lang.toLowerCase().startsWith('ja'))
+    if (!voice) { setMessage('Chưa có giọng tiếng Nhật. Hãy cài giọng tiếng Nhật trong hệ điều hành rồi thử lại.'); return }
+    const speech = new SpeechSynthesisUtterance(word)
+    utterance.current = speech; speech.lang = 'ja-JP'; speech.voice = voice
+    speech.onend = () => { utterance.current = null; setPlaying(false) }
+    speech.onerror = () => { utterance.current = null; setPlaying(false); setMessage('Không phát được giọng đọc. Hãy thử lại.') }
+    window.speechSynthesis.cancel(); setMessage('Giọng đọc tổng hợp của trình duyệt.'); setPlaying(true)
+    window.speechSynthesis.speak(speech)
   }
-
-  return (
-    <button
-      onClick={playAudio}
-      disabled={isPlaying}
-      className="p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-      title="Play pronunciation"
-    >
-      {isPlaying ? (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414zm-2.829 2.828a1 1 0 011.415 0A5.983 5.983 0 0115 10a5.984 5.984 0 01-1.757 4.243 1 1 0 01-1.415-1.415A3.984 3.984 0 0013 10a3.983 3.983 0 00-1.172-2.828 1 1 0 010-1.415z" clipRule="evenodd" />
-        </svg>
-      ) : (
-        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-          <path fillRule="evenodd" d="M9.383 3.076A1 1 0 0110 4v12a1 1 0 01-1.707.707L4.586 13H2a1 1 0 01-1-1V8a1 1 0 011-1h2.586l3.707-3.707a1 1 0 011.09-.217zM14.657 2.929a1 1 0 011.414 0A9.972 9.972 0 0119 10a9.972 9.972 0 01-2.929 7.071 1 1 0 01-1.414-1.414A7.971 7.971 0 0017 10c0-2.21-.894-4.208-2.343-5.657a1 1 0 010-1.414z" clipRule="evenodd" />
-        </svg>
-      )}
-    </button>
-  )
+  return <div className="space-y-1">
+    <button type="button" className="btn" onClick={speak} disabled={playing} aria-label={`Nghe cách đọc ${word}`}>{playing ? 'Đang đọc…' : 'Nghe tiếng Nhật'}</button>
+    {message && <p className="muted text-xs" role="status">{message}</p>}
+  </div>
 }
