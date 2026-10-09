@@ -76,11 +76,15 @@ export function parseJotoba(body: string): DictionaryEntry[] {
     if (!meanings.length) continue
     const text = typeof word.reading.kanji === 'string' && word.reading.kanji ? word.reading.kanji : word.reading.kana
     const hash = createHash('sha256').update(JSON.stringify([text, word.reading.kana, meanings])).digest('hex').slice(0, 24)
-    entries.push({ id: `jotoba-${hash}`, word: text, reading: word.reading.kana, romaji: '',
+    const entry: DictionaryEntry = { id: `jotoba-${hash}`, word: text, reading: word.reading.kana, romaji: '',
       meanings: [...new Set(meanings)].slice(0, 24), meaningLanguage: 'en', partOfSpeech: [...new Set(pos)].join('; ').slice(0, 500),
       level: null, topic: '', examples: [], source: { name: 'Jotoba · JMdict — Jim Breen / EDRDG (English glosses)',
         url: 'https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project',
-        license: 'CC BY-SA 4.0 — https://www.edrdg.org/edrdg/licence.html' } })
+        license: 'CC BY-SA 4.0 — https://www.edrdg.org/edrdg/licence.html' } }
+    // Keep snapshots below the foundation's 16 KiB cap, including room for the request wrapper.
+    while (entry.meanings.length > 1 && Buffer.byteLength(JSON.stringify(entry), 'utf8') > 16000) entry.meanings.pop()
+    if (Buffer.byteLength(JSON.stringify(entry), 'utf8') > 16000) throw unavailable()
+    entries.push(entry)
   }
   return entries.slice(0, 50)
 }
@@ -91,7 +95,8 @@ export class JotobaDictionaryProvider {
   private active = 0
   private window = 0
   private calls = 0
-  constructor(private http: JotobaHttp = jotobaHttp, private now = Date.now) {}
+  constructor(private http: JotobaHttp = jotobaHttp, private now = Date.now,
+    private backoff: (milliseconds: number) => Promise<void> = milliseconds => new Promise(resolve => setTimeout(resolve, milliseconds))) {}
 
   async search(query: DictionaryQuery, clientId: string) {
     const validated = parseQuery(query as unknown as Record<string, unknown>)
@@ -112,8 +117,9 @@ export class JotobaDictionaryProvider {
     this.active++
     try {
       let response: JotobaResponse | undefined
-      // One immediate retry for transient network/5xx errors; at most 7 seconds total transport time.
+      // One retry with 200 ms backoff for transient network/5xx errors; at most 7.2 seconds total.
       for (let attempt = 0; attempt < 2; attempt++) {
+        if (attempt > 0) await this.backoff(200)
         if (this.now() - this.window >= 60000) { this.window = this.now(); this.calls = 0 }
         if (this.calls >= 30) throw new JotobaError(429, 'JOTOBA_RATE_LIMIT', 'Đã đạt giới hạn gọi Jotoba của máy chủ.')
         this.calls++

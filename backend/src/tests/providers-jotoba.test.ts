@@ -33,6 +33,38 @@ test('malformed, oversized and wrong-language payloads cannot invent glosses', (
   const data = payload(); data.words[0].senses[0].language = 'German'
   assert.deepEqual(parseJotoba(JSON.stringify(data)), [])
 })
+test('word and snapshot bounds match saved-card validation', () => {
+  const data = payload()
+  data.words[0].reading = { kana: 'あ'.repeat(200), kanji: '猫'.repeat(200) }
+  data.words[0].senses[0].glosses = Array.from({ length: 24 }, (_, index) => `${index}`.padEnd(512, 'é'))
+  const entry = parseJotoba(JSON.stringify(data))[0]
+  assert.equal(entry.word.length, 200)
+  assert.ok(entry.meanings.length > 0 && entry.meanings.length <= 24)
+  assert.ok(entry.meanings.every(meaning => meaning.length <= 512))
+  assert.ok(entry.partOfSpeech.length <= 500)
+  assert.ok(Buffer.byteLength(JSON.stringify({ entry }), 'utf8') < 16384)
+  data.words[0].reading.kanji += '猫'
+  assert.throws(() => parseJotoba(JSON.stringify(data)), JotobaError)
+})
+test('only transient failures retry after exactly 200 ms backoff', async () => {
+  for (const transient of ['network', 'server']) {
+    const events: string[] = []
+    let calls = 0
+    const provider = new JotobaDictionaryProvider(async () => {
+      events.push('call'); calls++
+      if (calls === 1) {
+        if (transient === 'network') throw new Error('transport')
+        return { status: 503, body: '' }
+      }
+      return { status: 200, body: body() }
+    }, Date.now, async milliseconds => { assert.equal(milliseconds, 200); events.push('backoff') })
+    await provider.search({ q: '猫' }, 'a')
+    assert.deepEqual(events, ['call', 'backoff', 'call'])
+  }
+  const noRetry = new JotobaDictionaryProvider(async () => ({ status: 400, body: '' }), Date.now,
+    async () => { assert.fail('400 must not retry') })
+  await assert.rejects(noRetry.search({ q: '猫' }, 'a'), JotobaError)
+})
 test('short cache TTL, bounded retry and fair-use limits', async () => {
   let calls = 0; let now = 100000
   const provider = new JotobaDictionaryProvider(async q => { assert.equal(q, '猫'); calls++; return { status: calls === 1 ? 503 : 200, body: body() } }, () => now)
