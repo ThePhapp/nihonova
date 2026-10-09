@@ -10,7 +10,7 @@ export function jwtSecret(): string {
 }
 export function verifySession(token: string) {
   const decoded = jwt.verify(token, jwtSecret(), { algorithms: ['HS256'] })
-  if (typeof decoded === 'string' || typeof decoded.id !== 'string' || !/^[1-9]\d{0,9}$/.test(decoded.id) || Number(decoded.id) > 2147483647 || typeof decoded.email !== 'string' || typeof decoded.exp !== 'number') throw new HttpError(401, 'Invalid session')
+  if (typeof decoded === 'string' || typeof decoded.id !== 'string' || !/^[1-9]\d{0,9}$/.test(decoded.id) || Number(decoded.id) > 2147483647 || typeof decoded.email !== 'string' || decoded.email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(decoded.email) || typeof decoded.exp !== 'number') throw new HttpError(401, 'Invalid session')
   return { id: decoded.id, email: decoded.email }
 }
 export function authMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {

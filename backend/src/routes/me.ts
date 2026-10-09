@@ -5,6 +5,7 @@ import { authMiddleware, AuthenticatedRequest } from '../middleware/auth'
 import { asyncRoute, rateLimit } from '../middleware/http'
 import { boolean, integer, object, text, HttpError } from '../services/validation'
 import { entry, preferences, card, CardRow, learningState } from '../services/learning'
+import { reviewCard, reviewInput } from '../services/srs'
 const router = Router()
 router.use(rateLimit(120), authMiddleware)
 function user(req: AuthenticatedRequest): string {
@@ -31,6 +32,11 @@ router.post('/cards', asyncRoute(async (req, res) => {
     await client.query('COMMIT')
     res.json(card(saved.rows[0]))
   } catch (error) { await client.query('ROLLBACK'); throw error } finally { client.release() }
+}))
+router.post('/cards/:id/review', asyncRoute(async (req, res) => {
+  const id = text(req.params.id, 150)
+  const rating = reviewInput(req.body)
+  res.json(await reviewCard(user(req), id, rating))
 }))
 router.delete('/cards/:id', asyncRoute(async (req, res) => {
   const id = text(req.params.id, 150)

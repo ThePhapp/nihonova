@@ -35,7 +35,7 @@ test('JWT rejects unsupported algorithms, missing expiry and malformed identity'
     assert.throws(() => verifySession('token'), (error: unknown) => error instanceof HttpError && error.status === 503)
   } finally { if (before === undefined) delete process.env.JWT_SECRET; else process.env.JWT_SECRET = before }
 })
-test('statistics are derived from real activity and exam question counts in UTC', () => {
+test('statistics are derived from real activity and exam question counts', () => {
   const now = new Date('2026-10-09T12:00:00Z')
   const activities = [
     { kind: 'grammar', itemId: 'x', minutes: 5, completed: true, createdAt: '2026-10-09T10:00:00Z' },

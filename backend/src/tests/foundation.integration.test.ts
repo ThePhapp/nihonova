@@ -66,6 +66,22 @@ test('isolated additive migration and authenticated account state', { skip: !pro
     const other = String((await request('/auth/login', 'POST', { email: 'other@example.com', password: account.password })).data.token)
     assert.equal((await request('/me/cards/' + first.data.id, 'DELETE', undefined, other)).status, 404)
     assert.equal(((await request('/me/state', 'GET', undefined, other)).data.cards as unknown[]).length, 0)
+    assert.equal((await request('/me/cards/' + first.data.id + '/review', 'POST', { rating: 2 }, other)).status, 404)
+    assert.equal((await request('/me/cards/' + first.data.id + '/review', 'POST', { rating: 4 }, token)).status, 400)
+    const reviews = await Promise.all([
+      request('/me/cards/' + first.data.id + '/review', 'POST', { rating: 2, reviewedAt: '2099-01-01T00:00:00Z' }, token),
+      request('/me/cards/' + first.data.id + '/review', 'POST', { rating: 2 }, token)
+    ])
+    assert.deepEqual(reviews.map(value => value.status).sort(), [200, 409])
+    const reviewed = reviews.find(value => value.status === 200)!.data
+    assert.equal(reviewed.repetitions, 1)
+    assert.equal(reviewed.interval, 1)
+    assert.ok(Math.abs(Date.parse(String(reviewed.lastReviewed)) - Date.now()) < 10000)
+    assert.equal((await pool.query("SELECT count(*) FROM learning_activity WHERE user_id=$1 AND kind='review'", [identity.id])).rows[0].count, '1')
+    await pool.query("UPDATE learning_cards SET due_at=now()-interval '1 second' WHERE id=$1", [first.data.id])
+    assert.equal((await request('/me/cards/' + first.data.id + '/review', 'POST', { rating: 0 }, token)).data.repetitions, 0)
+    assert.equal((await pool.query("SELECT count(*) FROM learning_activity WHERE user_id=$1 AND kind='review'", [identity.id])).rows[0].count, '2')
+    assert.equal(((await request('/me/state', 'GET', undefined, token)).data.stats as { minutesToday: number }).minutesToday, 5)
     assert.equal((await request('/health/ready')).status, 200)
     assert.equal((await request('/unknown')).status, 404)
     const invalid = await fetch(base + '/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{' })

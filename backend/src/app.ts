@@ -18,6 +18,7 @@ export function createApp() {
     jwtSecret()
     await pool.query('SELECT user_id FROM learning_profiles LIMIT 0')
     await pool.query('SELECT saved_answers FROM exam_attempts LIMIT 0')
+    await pool.query('SELECT id,email,password FROM users LIMIT 0; SELECT id,entry,due_at,interval,ease,repetitions,last_reviewed FROM learning_cards LIMIT 0; SELECT user_id,kind,item_id,minutes,completed,created_at FROM learning_activity LIMIT 0; SELECT user_id,query,created_at FROM learning_history LIMIT 0')
     res.json({ status: 'ready' })
   }))
   app.use('/api/auth', auth)
