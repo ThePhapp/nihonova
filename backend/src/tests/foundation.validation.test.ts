@@ -18,6 +18,19 @@ test('snapshot validation keeps known fields and rejects malformed nested values
   assert.throws(() => preferences({ level: 'N5', targetLevel: 'N4', dailyMinutes: 181, furigana: true, romaji: false }), HttpError)
   assert.throws(() => integer(NaN, 0, 180), HttpError)
 })
+test('online dictionary snapshots accept provider bounds without inventing metadata', () => {
+  const online = { ...sampleEntry, word: 'a'.repeat(200), reading: '', romaji: '',
+    meanings: Array.from({ length: 24 }, (_, i) => `meaning ${i}`), partOfSpeech: '',
+    level: null, topic: '', meaningLanguage: 'en' }
+  assert.equal(entry(online).meanings.length, 24)
+  assert.equal(entry(online).partOfSpeech, '')
+  assert.equal(entry({ ...online, meanings: ['x'.repeat(512)] }).meanings[0].length, 512)
+  for (const changes of [{ word: 'x'.repeat(201) }, { meanings: new Array(25).fill('x') },
+    { meanings: ['x'.repeat(513)] }, { partOfSpeech: 'x'.repeat(501) }]) {
+    assert.throws(() => entry({ ...online, ...changes }), HttpError)
+  }
+  assert.throws(() => entry({ ...online, meanings: new Array(24).fill('猫'.repeat(512)) }), HttpError)
+})
 test('JWT rejects unsupported algorithms, missing expiry and malformed identity', () => {
   const before = process.env.JWT_SECRET
   process.env.JWT_SECRET = 'foundation-tests-only-secret-at-least-32-bytes'

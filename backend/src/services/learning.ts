@@ -32,9 +32,9 @@ export function entry(value: unknown): DictionaryEntry {
   const body = object(value), source = object(body.source)
   if (!Array.isArray(body.examples) || body.examples.length > 10) throw new HttpError(400, 'Invalid examples')
   const result: DictionaryEntry = {
-    id: text(body.id, 150), word: text(body.word, 150), reading: text(body.reading, 200, true),
-    romaji: text(body.romaji, 200, true), meanings: strings(body.meanings, 20, 500, 1),
-    partOfSpeech: text(body.partOfSpeech, 100), level: body.level === null ? null : level(body.level), topic: text(body.topic, 100, true),
+    id: text(body.id, 150), word: text(body.word, 200), reading: text(body.reading, 200, true),
+    romaji: text(body.romaji, 200, true), meanings: strings(body.meanings, 24, 512, 1),
+    partOfSpeech: text(body.partOfSpeech, 500, true), level: body.level === null ? null : level(body.level), topic: text(body.topic, 100, true),
     examples: body.examples.map(value => { const item = object(value); return { japanese: text(item.japanese, 1000), vietnamese: text(item.vietnamese, 1000) } }),
     source: { name: text(source.name, 200), license: text(source.license, 200) }
   }

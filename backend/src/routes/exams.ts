@@ -1,6 +1,7 @@
 import { randomUUID } from 'crypto'
 import { Router, RequestHandler } from 'express'
 import { AuthenticatedRequest, authMiddleware } from '../middleware/auth'
+import { pool } from '../config/db'
 import { examQuestions, ExamQuestion, Level, isLevel } from '../content'
 
 export interface ExamResult {
@@ -50,9 +51,10 @@ export function gradeAttempt(attempt: Attempt, answers: Record<string, number>, 
     total: graded.length, bySkill, createdAt: now.toISOString(), answers: graded }
 }
 
-// Load the shared pool only for actual database operations, so isolated tests need no DB configuration.
+// The Pool is lazy: importing it does not open a connection. Static resolution also
+// supports ts-node-dev, where a literal dynamic import of db.js has no source file.
 export class PostgresExamStore implements ExamStore {
-  constructor(private loadPool = async () => (await import('../config/db.js')).pool) {}
+  constructor(private loadPool = async () => pool) {}
   async start(userId: string, level: Level, questions: ExamQuestion[]): Promise<Attempt> {
     const pool = await this.loadPool()
     const client = await pool.connect()
