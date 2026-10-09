@@ -99,7 +99,7 @@ test('grammar level, search, and example comparison use server content', async (
   const query = initial[0].title
   const searched = contentResponse(page, 'grammar', 'N5', query)
   await page.getByRole('textbox', { name: 'Tìm ngữ pháp' }).fill(query)
-  await page.getByRole('button', { name: 'Tìm', exact: true }).click()
+  await page.getByRole('main').getByRole('button', { name: 'Tìm', exact: true }).click()
   const results = await items<Grammar>(await searched)
   expect(results.length).toBeGreaterThan(0)
   await expect(page.getByRole('navigation', { name: 'Bài ngữ pháp' }).getByRole('button')).toHaveCount(results.length)
