@@ -59,11 +59,16 @@ export function entry(value: unknown): DictionaryEntry {
 export function card(row: CardRow): Card {
   return { id: row.id, entry: row.entry, dueAt: row.due_at.toISOString(), interval: Number(row.interval), ease: Number(row.ease), repetitions: row.repetitions, lastReviewed: row.last_reviewed?.toISOString() || null }
 }
+export function localDay(value: Date | string, timezone = process.env.APP_TIMEZONE || 'Asia/Ho_Chi_Minh'): string {
+  const parts = new Intl.DateTimeFormat('en', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(value))
+  const part = (type: string) => parts.find(value => value.type === type)!.value
+  return part('year') + '-' + part('month') + '-' + part('day')
+}
 export function statistics(cards: Card[], activities: Activity[], exams: ExamResult[], now = new Date()) {
-  const today = now.toISOString().slice(0, 10)
-  const days = new Set(activities.filter(a => a.minutes > 0 || a.completed).map(a => a.createdAt.slice(0, 10)))
-  for (const c of cards) if (c.lastReviewed) days.add(c.lastReviewed.slice(0, 10))
-  for (const exam of exams) days.add(exam.createdAt.slice(0, 10))
+  const today = localDay(now)
+  const days = new Set(activities.filter(a => a.minutes > 0 || a.completed || a.kind === 'review').map(a => localDay(a.createdAt)))
+  for (const c of cards) if (c.lastReviewed) days.add(localDay(c.lastReviewed))
+  for (const exam of exams) days.add(localDay(exam.createdAt))
   let cursor = new Date(today + 'T00:00:00.000Z'), streak = 0
   if (!days.has(today)) cursor.setUTCDate(cursor.getUTCDate() - 1)
   while (days.has(cursor.toISOString().slice(0, 10))) { streak++; cursor.setUTCDate(cursor.getUTCDate() - 1) }
@@ -72,7 +77,7 @@ export function statistics(cards: Card[], activities: Activity[], exams: ExamRes
   return {
     cards: cards.length, due: cards.filter(c => Date.parse(c.dueAt) <= now.getTime()).length,
     mastered: cards.filter(c => c.repetitions >= 3 && c.interval >= 21).length, streak,
-    minutesToday: activities.filter(a => a.createdAt.slice(0, 10) === today).reduce((sum, a) => sum + a.minutes, 0),
+    minutesToday: activities.filter(a => localDay(a.createdAt) === today).reduce((sum, a) => sum + a.minutes, 0),
     accuracy: total ? Math.round(correct / total * 100) : 0
   }
 }
