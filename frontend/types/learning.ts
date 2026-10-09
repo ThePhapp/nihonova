@@ -13,7 +13,7 @@ export interface Card {
   id: string; entry: DictionaryEntry; dueAt: string; interval: number; ease: number
   repetitions: number; lastReviewed: string | null
 }
-export interface Activity { kind: 'kanji' | 'grammar' | 'reading' | 'listening'; itemId: string; minutes: number; completed: boolean; createdAt: string }
+export interface Activity { kind: 'kanji' | 'grammar' | 'reading' | 'listening' | 'review'; itemId: string; minutes: number; completed: boolean; createdAt: string }
 export interface ExamResult {
   id: string; level: Level; score: number; total: number
   bySkill: Record<string, { correct: number; total: number }>; createdAt: string
