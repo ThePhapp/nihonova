@@ -4,7 +4,7 @@
 
 Đây là ứng dụng hỗ trợ học JLPT, gồm:
 
-- `frontend/`: Next.js 13, React, TypeScript, TailwindCSS và Pages Router.
+- `frontend/`: Next.js 15, React 18, TypeScript, TailwindCSS và Pages Router.
 - `backend/`: Node.js, Express, TypeScript và PostgreSQL.
 - `infra/`: Docker Compose và script khởi tạo cơ sở dữ liệu.
 
@@ -48,7 +48,8 @@
 
 ## Cơ sở dữ liệu và cấu hình
 
-- Dùng `infra/.env.example` và `backend/.env.example` làm mẫu; cấu hình thực tế nằm trong `.env` và không được commit.
+- Dùng `.env.example`, `backend/.env.platform.example` và `frontend/.env.platform.example` làm mẫu; cấu hình thực tế nằm trong `.env` và không được commit. Không ghi đè cấu hình hiện hữu.
+- Dùng database test cô lập theo `docs/setup.md`; không chạy integration/E2E trên database người dùng.
 - Kiểm tra migration trước khi chạy trên dữ liệu thật.
 - Không chạy lệnh destructive như drop database, xóa migration hoặc xóa dữ liệu seed nếu người dùng chưa yêu cầu rõ.
 
