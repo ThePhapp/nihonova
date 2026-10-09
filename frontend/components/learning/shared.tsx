@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ReactNode, useEffect, useState } from 'react'
+import { ReactNode, useCallback, useEffect, useState } from 'react'
 import Layout from '@/components/layout/Layout'
 import { useAuth } from '@/contexts/AuthContext'
 import { api } from '@/utils/api'
@@ -12,7 +12,7 @@ export type LearningState = { activities: Activity[]; exams: ExamResult[] }
 export const errorText = (error: unknown) => error instanceof Error ? error.message : 'Không thể kết nối. Vui lòng thử lại.'
 export const jsonPost = (body: unknown): RequestInit => ({ method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
 
-export function useResource<T>(path: string | null) {
+export function useResource<T>(path: string | null, identity = '') {
   const [data, setData] = useState<T | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -26,8 +26,9 @@ export function useResource<T>(path: string | null) {
       if (!controller.signal.aborted) setError(errorText(reason))
     }).finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
-  }, [path, revision])
-  return { data, loading, error, reload: () => setRevision(value => value + 1) }
+  }, [path, revision, identity])
+  const reload = useCallback(() => setRevision(value => value + 1), [])
+  return { data, loading, error, reload }
 }
 
 export function LearningPage({ title, children }: { title: string; children: ReactNode }) {
@@ -48,11 +49,12 @@ export function Attribution({ source }: { source: Source }) {
 
 export function ProgressButton({ kind, itemId }: { kind: 'kanji' | 'grammar' | 'reading' | 'listening'; itemId: string }) {
   const { user, isLoading } = useAuth()
-  const state = useResource<LearningState>(user ? '/api/me/state' : null)
+  const state = useResource<LearningState>(user ? '/api/me/state' : null, user?.id)
   const [started] = useState(() => Date.now())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
+  useEffect(() => { setSaved(false); setError('') }, [user?.id])
   const completed = saved || Boolean(state.data?.activities.some(activity => activity.kind === kind && activity.itemId === itemId && activity.completed))
   async function save() {
     setSaving(true); setError('')
