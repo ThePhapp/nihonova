@@ -1,12 +1,23 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/router'
 import WritingPad from '@/components/learning/WritingPad'
 import { Attribution, ChoiceExercise, LearningPage, Level, LevelSelect, ProgressButton, ResourceStatus, Source, useResource } from '@/components/learning/shared'
 
 type Kanji = { id: string; character: string; onyomi: string[]; kunyomi: string[]; meaning: string; radical: string; strokes: number; level: Level; mnemonic: string; words: string[]; source: Source }
 export default function KanjiPage() {
+  const router = useRouter()
+  const routeLevel = typeof router.query.level === 'string' && ['N5', 'N4', 'N3', 'N2', 'N1'].includes(router.query.level) ? router.query.level as Level : 'N5'
+  const routeItem = typeof router.query.item === 'string' && router.query.item.length <= 200 ? router.query.item : ''
+  const [routeReady, setRouteReady] = useState(false)
   const [level, setLevel] = useState<Level>('N5')
   const [selected, setSelected] = useState('')
-  const resource = useResource<{ items: Kanji[] }>(`/api/content/kanji?level=${level}`)
+  useEffect(() => {
+    if (!router.isReady) return
+    setLevel(routeLevel)
+    setSelected(routeItem)
+    setRouteReady(true)
+  }, [router.isReady, routeLevel, routeItem])
+  const resource = useResource<{ items: Kanji[] }>(routeReady && router.isReady ? `/api/content/kanji?level=${level}` : null)
   const items = resource.data?.items ?? []
   const item = items.find(value => value.id === selected) ?? items[0]
   const options = item ? [item.meaning, ...items.filter(value => value.id !== item.id && value.meaning !== item.meaning).map(value => value.meaning)].filter((value, index, values) => values.indexOf(value) === index).slice(0, 4).sort((a, b) => a.localeCompare(b, 'vi')) : []
