@@ -4,6 +4,8 @@ import { pool } from './config/db'
 import auth from './routes/auth'
 import { jwtSecret } from './middleware/auth'
 import me from './routes/me'
+import dictionary from './routes/dictionary'
+import content from './routes/content'
 import { asyncRoute, errorHandler, rateLimit } from './middleware/http'
 import { HttpError, level, text } from './services/validation'
 export function createApp() {
@@ -22,6 +24,8 @@ export function createApp() {
   }))
   app.use('/api/auth', auth)
   app.use('/api/me', me)
+  app.use('/api/dictionary', dictionary)
+  app.use('/api/content', content)
   // Legacy data is read as-is; no crawler or seed runs during startup.
   app.get(['/api/vocabulary', '/api/vocab'], asyncRoute(async (req, res) => {
     const values: string[] = [], conditions: string[] = []
