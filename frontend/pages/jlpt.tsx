@@ -62,7 +62,7 @@ export default function JlptPage() {
       if (!attempt) return
       const seconds = Math.max(0, Math.ceil((Date.parse(attempt.expiresAt) - Date.now()) / 1000))
       setRemaining(seconds)
-      if (seconds === 0 && expiredSubmit.current !== attempt.id) { expiredSubmit.current = attempt.id; void submit() }
+      if (seconds === 0 && expiredSubmit.current !== attempt.id && !inFlight.current) { expiredSubmit.current = attempt.id; void submit() }
     }
     tick(); const timer = window.setInterval(tick, 1000)
     return () => window.clearInterval(timer)

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { ReactNode, useCallback, useEffect, useState } from 'react'
+import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import Layout from '@/components/layout/Layout'
 import { useAuth } from '@/contexts/AuthContext'
 import { api } from '@/utils/api'
@@ -54,14 +54,20 @@ export function ProgressButton({ kind, itemId }: { kind: 'kanji' | 'grammar' | '
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
   const [saved, setSaved] = useState(false)
-  useEffect(() => { setSaved(false); setError('') }, [user?.id])
+  const request = useRef<AbortController | null>(null)
+  useEffect(() => {
+    setSaved(false); setError(''); setSaving(false)
+    return () => request.current?.abort()
+  }, [user?.id])
   const completed = saved || Boolean(state.data?.activities.some(activity => activity.kind === kind && activity.itemId === itemId && activity.completed))
   async function save() {
+    if (request.current && !request.current.signal.aborted && saving) return
+    const controller = new AbortController(); request.current = controller
     setSaving(true); setError('')
     try {
-      await api<{ success: true }>('/api/me/activity', jsonPost({ kind, itemId, completed: true, minutes: Math.min(180, Math.max(0, Math.floor((Date.now() - started) / 60000))) }))
-      setSaved(true)
-    } catch (reason) { setError(errorText(reason)) } finally { setSaving(false) }
+      await api<{ success: true }>('/api/me/activity', { ...jsonPost({ kind, itemId, completed: true, minutes: Math.min(180, Math.max(0, Math.floor((Date.now() - started) / 60000))) }), signal: controller.signal })
+      if (!controller.signal.aborted) setSaved(true)
+    } catch (reason) { if (!controller.signal.aborted) setError(errorText(reason)) } finally { if (!controller.signal.aborted) setSaving(false) }
   }
   if (isLoading) return <p role="status">Đang kiểm tra tài khoản…</p>
   if (!user) return <p className="notice"><Link href="/login" className="underline">Đăng nhập</Link> để lưu tiến độ.</p>
