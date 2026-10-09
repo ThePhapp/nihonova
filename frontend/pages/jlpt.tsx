@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAuth } from '@/contexts/AuthContext'
 import { api } from '@/utils/api'
 import { errorText, ExamResult, jsonPost, LearningPage, LearningState, Level, LevelSelect, ResourceStatus, useResource } from '@/components/learning/shared'
+import { useExamAnswers } from '@/components/learning/useExamAnswers'
 
 type Attempt = { id: string; level: Level; expiresAt: string; questions: { id: string; skill: string; prompt: string; options: string[] }[] }
 function Result({ result }: { result: ExamResult }) {
@@ -21,6 +22,7 @@ export default function JlptPage() {
   const expiredSubmit = useRef('')
   const controller = useRef<AbortController | null>(null)
   const history = useResource<LearningState>(user ? '/api/me/state' : null, user?.id)
+  const autosave = useExamAnswers(attempt, answers)
   useEffect(() => {
     controller.current?.abort(); inFlight.current = false
     setAttempt(null); setAnswers({}); setResult(null); setError(''); setBusy(false)
@@ -43,12 +45,17 @@ export default function JlptPage() {
     const request = new AbortController(); controller.current = request
     inFlight.current = true; setBusy(true); setError('')
     try {
-      const value = await api<ExamResult>(`/api/exams/${encodeURIComponent(attempt.id)}/submit`, { ...jsonPost({ answers }), signal: request.signal })
+      try { await autosave.flush() } catch (reason) {
+        if (Date.now() < Date.parse(attempt.expiresAt)) throw reason
+        setError('Không lưu được đáp án cuối. Kết quả hết giờ sử dụng bản máy chủ đã nhận.')
+      }
+      if (request.signal.aborted) return
+      const value = await api<ExamResult>(`/api/exams/${encodeURIComponent(attempt.id)}/submit`, { ...jsonPost({ answers: Date.now() >= Date.parse(attempt.expiresAt) ? {} : answers }), signal: request.signal })
       if (request.signal.aborted) return
       setResult(value); setAttempt(null); history.reload()
     } catch (reason) { if (!request.signal.aborted) setError(errorText(reason)) }
     finally { if (!request.signal.aborted) { inFlight.current = false; setBusy(false) } }
-  }, [attempt, answers, history.reload])
+  }, [attempt, answers, history.reload, autosave.flush])
   useEffect(() => {
     if (!attempt) return
     function tick() {
@@ -66,5 +73,23 @@ export default function JlptPage() {
     window.addEventListener('beforeunload', warn)
     return () => window.removeEventListener('beforeunload', warn)
   }, [attempt])
-  return <LearningPage title="Luyện đề JLPT">{isLoading ? <p role="status">Đang kiểm tra tài khoản…</p> : !user ? <p className="notice"><Link href="/login" className="underline">Đăng nhập</Link> để bắt đầu và lưu kết quả.</p> : <><p className="notice">Thời hạn do máy chủ quyết định. Hết giờ sẽ tự gửi đáp án; nếu mất mạng, dùng nút gửi lại. Rời trang sẽ mất đáp án chưa gửi.</p>{error && <p role="alert" className="notice">{error}</p>}{!attempt && <div className="flex flex-wrap gap-4"><LevelSelect value={level} onChange={setLevel} /><button className="btn btn-primary" disabled={busy} onClick={start}>{busy ? 'Đang bắt đầu…' : 'Bắt đầu lượt luyện mới'}</button></div>}{attempt && <section className="panel space-y-6 p-5"><h2 className="text-xl font-bold">{attempt.level} · Còn {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}</h2><p>Đã chọn {Object.keys(answers).length}/{attempt.questions.length} câu</p>{attempt.questions.length === 0 && <p>Máy chủ chưa cung cấp câu hỏi.</p>}{attempt.questions.map((question, index) => <fieldset key={question.id} className="space-y-2" disabled={busy || remaining === 0}><legend className="font-semibold">{index + 1}. {question.prompt} ({question.skill})</legend>{question.options.map((option, optionIndex) => <label key={optionIndex} className="flex items-start gap-2"><input type="radio" name={question.id} checked={answers[question.id] === optionIndex} onChange={() => setAnswers(previous => ({ ...previous, [question.id]: optionIndex }))} />{option}</label>)}</fieldset>)}<button className="btn btn-primary" disabled={busy} onClick={() => void submit()}>{busy ? 'Đang gửi…' : remaining === 0 ? 'Gửi lại đáp án' : 'Nộp bài'}</button></section>}{result && <Result result={result} />}<section className="space-y-3"><h2 className="text-xl font-bold">Lịch sử từ tài khoản</h2><ResourceStatus {...history} empty={Boolean(history.data && !history.data.exams.length)} retry={history.reload} />{history.data?.exams.map(exam => <details className="panel p-4" key={exam.id}><summary>{exam.level} · {new Date(exam.createdAt).toLocaleString('vi-VN')} · {exam.score}/{exam.total}</summary><Result result={exam} /></details>)}</section></>}</LearningPage>
+  return <LearningPage title="Luyện đề JLPT">
+    {isLoading ? <p role="status">Đang kiểm tra tài khoản…</p> : !user ? <p className="notice"><Link href="/login" className="underline">Đăng nhập</Link> để bắt đầu và lưu kết quả.</p> : <>
+      <p className="notice">Đáp án được lưu tự động trước hạn. Hết giờ, máy chủ chấm bản đã lưu. Nếu mất mạng, dùng nút gửi lại. Rời trang sẽ mất đáp án chưa lưu và không thể tiếp tục lượt này tại đây.</p>
+      {error && <p role="alert" className="notice">{error}</p>}
+      {!attempt && <div className="flex flex-wrap gap-4"><LevelSelect value={level} onChange={setLevel} /><button className="btn btn-primary" disabled={busy} onClick={start}>{busy ? 'Đang bắt đầu…' : 'Bắt đầu lượt luyện mới'}</button></div>}
+      {attempt && <section className="panel space-y-6 p-5">
+        <h2 className="text-xl font-bold">{attempt.level} · Còn {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}</h2>
+        <p role="status">{autosave.status === 'saved' ? 'Đã lưu đáp án trên máy chủ.' : autosave.status === 'saving' ? 'Đang lưu đáp án…' : autosave.status === 'error' ? 'Chưa lưu được — kiểm tra kết nối.' : 'Chưa chọn đáp án.'}</p>
+        {autosave.error && <div className="notice" role="alert">{autosave.error} <button className="btn" disabled={busy || remaining === 0} onClick={() => void autosave.flush().catch(() => undefined)}>Lưu lại</button></div>}
+        {remaining === 0 && <p className="notice">Đã hết hạn. Chỉ các đáp án máy chủ nhận trước hạn được tính.</p>}
+        <p>Đã chọn {Object.keys(answers).length}/{attempt.questions.length} câu</p>
+        {attempt.questions.length === 0 && <p>Máy chủ chưa cung cấp câu hỏi.</p>}
+        {attempt.questions.map((question, index) => <fieldset key={question.id} className="space-y-2" disabled={busy || remaining === 0}><legend className="font-semibold">{index + 1}. {question.prompt} ({question.skill})</legend>{question.options.map((option, optionIndex) => <label key={optionIndex} className="flex items-start gap-2"><input type="radio" name={question.id} checked={answers[question.id] === optionIndex} onChange={() => setAnswers(previous => ({ ...previous, [question.id]: optionIndex }))} />{option}</label>)}</fieldset>)}
+        <button className="btn btn-primary" disabled={busy} onClick={() => void submit()}>{busy ? 'Đang gửi…' : remaining === 0 ? 'Gửi lại đáp án' : 'Nộp bài'}</button>
+      </section>}
+      {result && <Result result={result} />}
+      <section className="space-y-3"><h2 className="text-xl font-bold">Lịch sử từ tài khoản</h2><ResourceStatus {...history} empty={Boolean(history.data && !history.data.exams.length)} retry={history.reload} />{history.data?.exams.map(exam => <details className="panel p-4" key={exam.id}><summary>{exam.level} · {new Date(exam.createdAt).toLocaleString('vi-VN')} · {exam.score}/{exam.total}</summary><Result result={exam} /></details>)}</section>
+    </>}
+  </LearningPage>
 }
