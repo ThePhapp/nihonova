@@ -128,7 +128,7 @@ export function createExamsRouter(store: ExamStore = new PostgresExamStore(), au
       if (!questions.length) throw new ExamError(503, 'EXAM_UNAVAILABLE', 'Chưa có nội dung cho cấp độ này.')
       const attempt = await store.start(String(req.user.id), level, questions)
       res.json({ id: attempt.id, level, expiresAt: attempt.expiresAt,
-        questions: attempt.questions.map(({ id, skill, prompt, options }) => ({ id, skill, prompt, options })) })
+        questions: attempt.questions.map(({ id, skill, prompt, options, audioText }) => ({ id, skill, prompt, options, ...(audioText ? { audioText } : {}) })) })
     } catch (error) { sendError(error, res) }
   })
   router.post('/:id/submit', async (req: AuthenticatedRequest, res) => {

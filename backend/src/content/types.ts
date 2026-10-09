@@ -82,6 +82,7 @@ export interface Listening {
 export interface ExamQuestion extends Question {
   id: string;
   level: Level;
-  skill: 'vocabulary' | 'grammar' | 'reading' | 'listening';
+  skill: 'vocabulary' | 'kanji' | 'grammar' | 'reading' | 'listening';
+  audioText?: string;
   source: Source;
 }

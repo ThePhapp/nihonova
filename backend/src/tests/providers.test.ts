@@ -14,12 +14,16 @@ test('every starter category covers all levels with source metadata and valid qu
   assert.equal(words.find(item => item.word === '続ける')?.conjugations?.potential, '続けられる')
   for (const level of levels) {
     for (const dataset of [words, kanji, grammar, reading, listening, examQuestions]) assert.ok(dataset.some(item => item.level === level), level)
+    for (const skill of ['vocabulary', 'kanji', 'grammar', 'reading', 'listening']) assert.ok(examQuestions.some(item => item.level === level && item.skill === skill))
   }
   for (const dataset of [words, kanji, grammar, reading, listening]) {
     assert.equal(new Set(dataset.map(item => item.id)).size, dataset.length)
     for (const item of dataset) { assert.ok(item.source.name); assert.ok(item.source.license) }
   }
-  for (const item of examQuestions) assert.ok(item.answer >= 0 && item.answer < item.options.length && item.explanation)
+  for (const item of examQuestions) {
+    assert.ok(item.answer >= 0 && item.answer < item.options.length && item.explanation && item.source.name && item.source.license)
+    if (item.skill === 'listening') { assert.ok(item.audioText); assert.ok(!item.prompt.includes('女：')); assert.ok(!item.prompt.includes('男：')) }
+  }
   for (const item of reading) for (const question of item.questions) assert.ok(question.answer >= 0 && question.answer < question.options.length)
   for (const item of listening) assert.ok(item.question.answer >= 0 && item.question.answer < item.question.options.length)
 })

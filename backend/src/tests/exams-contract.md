@@ -1,6 +1,6 @@
 # Exam integration addition
 
-Original starter practice only: 4 questions/level, a 10-minute timer, not an official JLPT simulation. Start returns only id/skill/prompt/options; no answers, explanation or source in questions. Score is a count of correct answers, never a percentage.
+Original starter practice only: 5 questions/level (vocabulary, kanji, grammar, reading, listening), a 10-minute timer, not an official JLPT simulation. Start returns id/skill/prompt/options and optional audioText for listening TTS; no answers, explanation or source in questions. Listening prompt is only the question; original dialogue is in audioText, to be played by the browser with transcript hidden during the attempt. Score is a count of correct answers, never a percentage.
 
 Foundation migration required: add `exam_attempts.saved_answers jsonb NOT NULL DEFAULT '{}'::jsonb`. Preserve existing attempts; no data replacement. Lead owns migration and mounting default routers.
 
