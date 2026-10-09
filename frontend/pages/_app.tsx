@@ -1,19 +1,11 @@
 import type { AppProps } from 'next/app'
-import { Inter } from 'next/font/google'
+import Head from 'next/head'
 import { ThemeProvider } from '../contexts/ThemeContext'
 import { AuthProvider } from '../contexts/AuthContext'
 import '../styles/globals.css'
-
-const inter = Inter({ subsets: ['latin'] })
-
 export default function App({ Component, pageProps }: AppProps) {
-  return (
-    <ThemeProvider>
-      <AuthProvider>
-        <div className={inter.className}>
-          <Component {...pageProps} />
-        </div>
-      </AuthProvider>
-    </ThemeProvider>
-  )
+  return <ThemeProvider><AuthProvider>
+    <Head><title>JLPT Study — Học tiếng Nhật</title><meta name="viewport" content="width=device-width, initial-scale=1" /></Head>
+    <Component {...pageProps} />
+  </AuthProvider></ThemeProvider>
 }

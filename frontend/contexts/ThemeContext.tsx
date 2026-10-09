@@ -17,7 +17,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const savedTheme = localStorage.getItem('theme') as Theme
     const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches
 
-    if (savedTheme) {
+    if (savedTheme === 'light' || savedTheme === 'dark') {
       setTheme(savedTheme)
       document.documentElement.classList.toggle('dark', savedTheme === 'dark')
     } else if (systemDark) {
@@ -30,7 +30,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const newTheme = theme === 'light' ? 'dark' : 'light'
     setTheme(newTheme)
     localStorage.setItem('theme', newTheme)
-    document.documentElement.classList.toggle('dark')
+    document.documentElement.classList.toggle('dark', newTheme === 'dark')
   }
 
   return (

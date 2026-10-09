@@ -1,133 +1,40 @@
-import React, { useState } from 'react';
-import { useRouter } from 'next/router';
-
-interface AuthFormProps {
-  mode: 'login' | 'register';
-}
-
-export const AuthForm: React.FC<AuthFormProps> = ({ mode }) => {
-  const router = useRouter();
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    confirmPassword: '',
-  });
-  const [error, setError] = useState('');
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setError('');
-
-    if (mode === 'register' && formData.password !== formData.confirmPassword) {
-      setError('Passwords do not match');
-      return;
-    }
-
+import { FormEvent, useState } from 'react'
+import { useRouter } from 'next/router'
+import { useAuth } from '../../contexts/AuthContext'
+import { errorMessage } from '../../utils/api'
+export function AuthForm({ mode, onSuccess }: { mode: 'login' | 'register'; onSuccess?: () => void }) {
+  const { login, register } = useAuth()
+  const router = useRouter()
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
+  const [confirmation, setConfirmation] = useState('')
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
+  async function submit(event: FormEvent) {
+    event.preventDefault()
+    if (busy) return
+    setError('')
+    if (mode === 'register' && password !== confirmation) { setError('Hai mật khẩu chưa khớp.'); return }
+    const bytes = new TextEncoder().encode(password).length
+    if (mode === 'register' && (bytes < 8 || bytes > 72)) { setError('Mật khẩu cần từ 8 đến 72 byte UTF-8.'); return }
+    setBusy(true)
     try {
-      const response = await fetch(`/api/auth/${mode}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Authentication failed');
-      }
-
-      // Store the token
-      localStorage.setItem('token', data.token);
-      
-      // Redirect to dashboard
-      router.push('/dashboard');
-    } catch (err) {
-      setError(err.message);
-    }
-  };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div>
-          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
-            {mode === 'login' ? 'Sign in to your account' : 'Create new account'}
-          </h2>
-        </div>
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
-          <div className="rounded-md shadow-sm -space-y-px">
-            <div>
-              <label htmlFor="email" className="sr-only">
-                Email address
-              </label>
-              <input
-                id="email"
-                name="email"
-                type="email"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-t-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Email address"
-                value={formData.email}
-                onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              />
-            </div>
-            <div>
-              <label htmlFor="password" className="sr-only">
-                Password
-              </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                placeholder="Password"
-                value={formData.password}
-                onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              />
-            </div>
-            {mode === 'register' && (
-              <div>
-                <label htmlFor="confirmPassword" className="sr-only">
-                  Confirm Password
-                </label>
-                <input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  required
-                  className="appearance-none rounded-none relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-b-md focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 focus:z-10 sm:text-sm"
-                  placeholder="Confirm Password"
-                  value={formData.confirmPassword}
-                  onChange={(e) =>
-                    setFormData({ ...formData, confirmPassword: e.target.value })
-                  }
-                />
-              </div>
-            )}
-          </div>
-
-          {error && (
-            <div className="text-red-500 text-sm text-center">{error}</div>
-          )}
-
-          <div>
-            <button
-              type="submit"
-              className="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
-            >
-              {mode === 'login' ? 'Sign in' : 'Sign up'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-};
-
-export default AuthForm;
+      await (mode === 'login' ? login(email, password) : register(email, password))
+      if (onSuccess) onSuccess()
+      else void router.push(mode === 'login' ? '/dashboard' : '/login?registered=1')
+    } catch (failure) { setError(errorMessage(failure)) }
+    finally { setBusy(false) }
+  }
+  return <form onSubmit={submit} className="space-y-4" aria-busy={busy}>
+    <div><label htmlFor="auth-email">Email <span className="text-red-700 dark:text-red-300">*</span></label>
+      <input id="auth-email" className="field mt-1" type="email" required autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} /></div>
+    <div><label htmlFor="auth-password">Mật khẩu <span className="text-red-700 dark:text-red-300">*</span></label>
+      <input id="auth-password" className="field mt-1" type="password" required autoComplete={mode === 'login' ? 'current-password' : 'new-password'} value={password} onChange={e => setPassword(e.target.value)} />
+      {mode === 'register' && <p className="muted mt-1">Từ 8 đến 72 byte UTF-8; ký tự có dấu có thể chiếm nhiều byte.</p>}</div>
+    {mode === 'register' && <div><label htmlFor="auth-confirm">Nhập lại mật khẩu <span className="text-red-700 dark:text-red-300">*</span></label>
+      <input id="auth-confirm" className="field mt-1" type="password" required autoComplete="new-password" value={confirmation} onChange={e => setConfirmation(e.target.value)} /></div>}
+    <div className="min-h-[1.5rem]" aria-live="polite">{error && <p role="alert" className="text-red-700 dark:text-red-300">{error}</p>}</div>
+    <button type="submit" className="btn btn-primary w-full" disabled={busy}>{busy ? 'Đang xử lý…' : mode === 'login' ? 'Đăng nhập' : 'Tạo tài khoản'}</button>
+  </form>
+}
+export default AuthForm
