@@ -4,8 +4,9 @@ import { useAuth } from '@/contexts/AuthContext'
 import { api } from '@/utils/api'
 import { errorText, ExamResult, jsonPost, LearningPage, LearningState, Level, LevelSelect, ResourceStatus, useResource } from '@/components/learning/shared'
 import { useExamAnswers } from '@/components/learning/useExamAnswers'
+import SpeechPlayer from '@/components/learning/SpeechPlayer'
 
-type Attempt = { id: string; level: Level; expiresAt: string; questions: { id: string; skill: string; prompt: string; options: string[] }[] }
+type Attempt = { id: string; level: Level; expiresAt: string; questions: { id: string; skill: string; prompt: string; options: string[]; audioText?: string }[] }
 function Result({ result }: { result: ExamResult }) {
   return <section className="panel space-y-4 p-5"><h2 className="text-2xl font-bold">Kết quả luyện tập {result.level}: {result.score}/{result.total}</h2><p className="muted">Do máy chủ chấm. Điểm này không quy đổi sang điểm chuẩn hoặc chứng nhận JLPT.</p><ul>{Object.entries(result.bySkill).map(([skill, value]) => <li key={skill}>{skill}: {value.correct}/{value.total}</li>)}</ul><ol className="space-y-3">{result.answers.map((answer, index) => <li key={answer.questionId}><p>Câu {index + 1}: {answer.correct ? 'Đúng' : 'Sai hoặc bỏ trống'} · Đáp án số {answer.correctAnswer + 1}</p><p>{answer.explanation}</p></li>)}</ol></section>
 }
@@ -85,7 +86,7 @@ export default function JlptPage() {
         {remaining === 0 && <p className="notice">Đã hết hạn. Chỉ các đáp án máy chủ nhận trước hạn được tính.</p>}
         <p>Đã chọn {Object.keys(answers).length}/{attempt.questions.length} câu</p>
         {attempt.questions.length === 0 && <p>Máy chủ chưa cung cấp câu hỏi.</p>}
-        {attempt.questions.map((question, index) => <fieldset key={question.id} className="space-y-2" disabled={busy || remaining === 0}><legend className="font-semibold">{index + 1}. {question.prompt} ({question.skill})</legend>{question.options.map((option, optionIndex) => <label key={optionIndex} className="flex items-start gap-2"><input type="radio" name={question.id} checked={answers[question.id] === optionIndex} onChange={() => setAnswers(previous => ({ ...previous, [question.id]: optionIndex }))} />{option}</label>)}</fieldset>)}
+        {attempt.questions.map((question, index) => <fieldset key={question.id} className="space-y-2" disabled={busy || remaining === 0}><legend className="font-semibold">{index + 1}. {question.prompt} ({question.skill})</legend>{question.audioText && <div className="space-y-3"><SpeechPlayer text={question.audioText} /><details><summary className="cursor-pointer">Hiện lời thoại (hỗ trợ luyện tập)</summary><p lang="ja">{question.audioText}</p></details></div>}{question.options.map((option, optionIndex) => <label key={optionIndex} className="flex items-start gap-2"><input type="radio" name={question.id} checked={answers[question.id] === optionIndex} onChange={() => setAnswers(previous => ({ ...previous, [question.id]: optionIndex }))} />{option}</label>)}</fieldset>)}
         <button className="btn btn-primary" disabled={busy} onClick={() => void submit()}>{busy ? 'Đang gửi…' : remaining === 0 ? 'Gửi lại đáp án' : 'Nộp bài'}</button>
       </section>}
       {result && <Result result={result} />}
