@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/index.js",
     "migrate": "ts-node src/scripts/run-migrations.ts",
-    "test": "npm run build && node --test dist/tests/foundation*.js"
+    "test": "npm run build && node --test dist/tests/*.test.js"
   },
   "dependencies": {
     "@types/bcryptjs": "^2.4.6",

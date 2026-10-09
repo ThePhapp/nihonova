@@ -1,0 +1,86 @@
+import { test, expect, Page } from '@playwright/test'
+
+async function assertFits(page: Page) {
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
+}
+async function login(page: Page, email: string) {
+  await page.goto('/login')
+  await page.locator('#auth-email').fill(email)
+  await page.locator('#auth-password').fill('Browser-Study-2026!')
+  await page.locator('form').getByRole('button', { name: 'Đăng nhập', exact: true }).click()
+  await expect(page).toHaveURL(/\/dashboard$/)
+}
+async function state(page: Page) {
+  return page.evaluate(async () => {
+    const response = await fetch('/api/me/state', { headers: { Authorization: `Bearer ${localStorage.getItem('jlpt-token')}` } })
+    if (!response.ok) throw new Error('State request failed: ' + response.status)
+    return response.json()
+  })
+}
+
+test('register, lookup, save, review, practice and restore account', async ({ page }, info) => {
+  const errors: string[] = []
+  page.on('pageerror', error => errors.push(error.message))
+  const email = `browser-${info.project.name}-${Date.now()}@example.test`
+  await page.goto('/register')
+  await page.locator('#auth-email').fill(email)
+  await page.locator('#auth-password').fill('Browser-Study-2026!')
+  await page.locator('#auth-confirm').fill('Browser-Study-2026!')
+  await page.getByRole('button', { name: 'Tạo tài khoản', exact: true }).click()
+  await expect(page).toHaveURL(/\/login\?registered=1$/)
+  await login(page, email)
+  await page.goto('/dictionary')
+  await page.getByLabel('Từ khóa', { exact: true }).fill('水')
+  await expect(page.locator('article').first()).toContainText('nước')
+  await expect(page.locator('article ruby rt').first()).toHaveText('みず')
+  await page.locator('form').getByRole('button', { name: 'Tra từ', exact: true }).click()
+  await page.getByRole('button', { name: 'Lưu thẻ ôn tập', exact: true }).first().click()
+  await expect(page.getByRole('button', { name: 'Đã lưu thẻ', exact: true }).first()).toBeDisabled()
+  await assertFits(page)
+  await page.goto('/study')
+  await expect(page.getByRole('heading', { level: 1 })).toContainText(/Ôn/)
+  // The study interaction is deliberately exercised through rendered controls.
+  await page.getByRole('button', { name: /Lật thẻ|Xem đáp án|Hiện đáp án/ }).first().click()
+  await page.getByRole('button', { name: /Nhớ tốt|Tốt|Nhớ được|Đúng|Dễ/ }).first().click()
+  await expect.poll(async () => (await state(page)).cards[0]?.repetitions).toBeGreaterThan(0)
+  await page.goto('/jlpt')
+  await page.getByRole('button', { name: 'Bắt đầu lượt luyện mới' }).click()
+  await expect(page.locator('fieldset').first()).toBeVisible()
+  const questions = page.locator('fieldset')
+  for (let i = 0; i < await questions.count(); i++) await questions.nth(i).getByRole('radio').first().check()
+  await page.getByRole('button', { name: 'Nộp bài', exact: true }).click()
+  await expect(page.getByRole('heading', { name: /Kết quả luyện tập N5/ }).first()).toBeVisible()
+  const saved = await state(page)
+  expect(saved.cards).toHaveLength(1)
+  expect(saved.exams).toHaveLength(1)
+  expect(saved.history).toContain('水')
+  await page.goto('/dashboard')
+  await assertFits(page)
+  await page.screenshot({ path: info.outputPath('dashboard.png'), fullPage: true })
+  await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click()
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('jlpt-token'))).toBeNull()
+  await login(page, email)
+  const restored = await state(page)
+  expect(restored.cards[0].id).toBe(saved.cards[0].id)
+  expect(restored.cards[0].repetitions).toBe(saved.cards[0].repetitions)
+  expect(restored.exams[0].id).toBe(saved.exams[0].id)
+  expect(errors).toEqual([])
+})
+
+test('dictionary empty/error recovery, theme persistence and narrow layout', async ({ page }, info) => {
+  await page.goto('/dictionary')
+  await page.getByLabel('Từ khóa', { exact: true }).fill('zzzzzzzzzzzzzzzzzz')
+  await expect(page.getByText('Không có kết quả phù hợp.', { exact: false })).toBeVisible()
+  await page.route('**/api/dictionary?**', route => route.abort())
+  await page.getByLabel('Từ khóa', { exact: true }).fill('水')
+  await expect(page.locator('main').getByRole('alert')).toBeVisible()
+  await page.unroute('**/api/dictionary?**')
+  await page.getByRole('button', { name: 'Thử lại', exact: true }).click()
+  await expect(page.locator('article').first()).toContainText('nước')
+  await page.getByRole('button', { name: 'Bật giao diện tối' }).click()
+  await expect(page.locator('html')).toHaveClass(/dark/)
+  await page.reload()
+  await expect(page.locator('html')).toHaveClass(/dark/)
+  await assertFits(page)
+  await page.screenshot({ path: info.outputPath('dictionary-dark.png'), fullPage: true })
+})

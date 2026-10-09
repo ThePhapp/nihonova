@@ -8,3 +8,11 @@ coverage/
 .vscode/
 *.log
 .idea/
+!/.env.example
+!/backend/.env.platform.example
+!/frontend/.env.platform.example
+*.tsbuildinfo
+output/
+test-results/
+playwright-report/
+.playwright-cli/

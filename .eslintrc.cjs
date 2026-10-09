@@ -11,7 +11,9 @@ module.exports = {
   ],
   parser: '@typescript-eslint/parser',
   plugins: ['@typescript-eslint'],
-  rules: {},
+  rules: {
+    '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
+  },
   overrides: [
     {
       files: ['frontend/**/*.{ts,tsx,js,jsx}'],

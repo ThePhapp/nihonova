@@ -2,3 +2,4 @@ node_modules
 dist
 frontend/.next
 backend/dist
+**/next-env.d.ts
