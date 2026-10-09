@@ -25,6 +25,7 @@ test('every starter category covers all levels with source metadata and valid qu
 })
 test('Japanese, kana, romaji and unaccented Vietnamese lookups return original entries', () => {
   for (const entry of words) {
+    assert.equal(entry.meaningLanguage, 'vi')
     for (const query of [entry.word, entry.reading, entry.romaji, entry.meanings[0]]) {
       assert.ok(provider.search({ q: query }).entries.some(item => item.id === entry.id), query)
     }

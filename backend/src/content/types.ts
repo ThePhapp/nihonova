@@ -18,8 +18,9 @@ export interface DictionaryEntry {
   reading: string;
   romaji: string;
   meanings: string[];
+  meaningLanguage: 'vi' | 'en';
   partOfSpeech: string;
-  level: Level;
+  level: Level | null;
   topic: string;
   examples: Example[];
   source: Source;

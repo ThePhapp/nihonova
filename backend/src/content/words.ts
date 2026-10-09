@@ -3,7 +3,7 @@ import { source } from './metadata';
 
 function word(level: Level, id: string, text: string, reading: string, romaji: string, meaning: string, partOfSpeech: string, topic: string, japanese: string, vietnamese: string, conjugations?: Record<string, string>): DictionaryEntry {
   const examples: Example[] = [{ japanese, vietnamese }];
-  return { id: `word-${level}-${id}`, level, word: text, reading, romaji, meanings: [meaning], partOfSpeech, topic, examples, source, ...(conjugations ? { conjugations } : {}) };
+  return { id: `word-${level}-${id}`, level, word: text, reading, romaji, meanings: [meaning], meaningLanguage: 'vi', partOfSpeech, topic, examples, source, ...(conjugations ? { conjugations } : {}) };
 }
 
 // Forms are individually authored for these verbs; no generic conjugation inference.
