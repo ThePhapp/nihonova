@@ -115,7 +115,10 @@ test('HTTP start hides all grading metadata and validates submissions and auth',
     const start = await send('/start', { level: 'N5' })
     const data = await start.json() as { questions: Array<Record<string, unknown>> }
     assert.equal(start.status, 200)
-    for (const question of data.questions) assert.deepEqual(Object.keys(question).sort(), ['id', 'options', 'prompt', 'skill'])
+    for (const question of data.questions) {
+      assert.deepEqual(Object.keys(question).sort(), question.skill === 'listening' ? ['audioText', 'id', 'options', 'prompt', 'skill'] : ['id', 'options', 'prompt', 'skill'])
+      if (question.skill === 'listening') { assert.ok(question.audioText); assert.ok(!String(question.prompt).includes('女：')) }
+    }
     assert.equal((await send('/start', { level: 'N0' })).status, 400)
     assert.equal((await send('/start', { level: 'N5' }, '')).status, 401)
     assert.equal((await send(`/${id}/submit`, { answers: { unknown: 0 } })).status, 400)
