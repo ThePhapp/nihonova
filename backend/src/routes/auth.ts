@@ -1,7 +1,7 @@
 import { Router } from 'express'
 import bcrypt from 'bcryptjs'
 import { pool } from '../config/db'
-import { authMiddleware, AuthenticatedRequest, clearSessionCookie, jwtSecret, setSessionCookie, signSession } from '../middleware/auth'
+import { authMiddleware, AuthenticatedRequest, clearSessionCookie, jwtSecret, optionalAuthMiddleware, setSessionCookie, signSession } from '../middleware/auth'
 import { asyncRoute, rateLimit } from '../middleware/http'
 import { credentials, HttpError, object, password } from '../services/validation'
 const router = Router()
@@ -27,6 +27,11 @@ router.post('/login', rateLimit(20), asyncRoute(async (req, res) => {
   res.json({ success: true, token, user: { id: identity.id, email: identity.email } })
 }))
 router.post('/logout', (_req, res) => { clearSessionCookie(res); res.status(204).end() })
+router.get('/session', optionalAuthMiddleware, (req: AuthenticatedRequest, res) => {
+  if (!req.user) return res.json({ user: null })
+  setSessionCookie(res, signSession(req.user))
+  res.json({ user: { id: req.user.id, email: req.user.email } })
+})
 router.post('/password', rateLimit(5), authMiddleware, asyncRoute(async (req: AuthenticatedRequest, res) => {
   if (!req.user) throw new HttpError(401, 'Authentication required')
   const body = object(req.body)

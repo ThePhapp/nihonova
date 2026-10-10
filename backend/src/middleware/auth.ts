@@ -36,6 +36,10 @@ function cookieToken(header: string | undefined): string | null {
   }
   return null
 }
+function requestToken(req: Request): string | null {
+  const match = /^Bearer ([^\s]+)$/i.exec(req.headers.authorization || '')
+  return match?.[1] ?? cookieToken(req.headers.cookie)
+}
 export function protectCookieRequests(origins: string[]) {
   const allowed = new Set(origins)
   return (req: Request, res: Response, next: NextFunction) => {
@@ -46,8 +50,7 @@ export function protectCookieRequests(origins: string[]) {
   }
 }
 export function authMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
-  const match = /^Bearer ([^\s]+)$/i.exec(req.headers.authorization || '')
-  const token = match?.[1] ?? cookieToken(req.headers.cookie)
+  const token = requestToken(req)
   if (!token || token.length > 4096) return res.status(401).json({ error: 'Authentication required' })
   let session: SessionIdentity
   try { session = verifySession(token) } catch (error) {
@@ -57,6 +60,25 @@ export function authMiddleware(req: AuthenticatedRequest, res: Response, next: N
   pool.query<{ id: number; email: string; session_version: number }>('SELECT id,email,session_version FROM users WHERE id=$1', [session.id]).then(result => {
     const user = result.rows[0]
     if (!user || user.email !== session.email || user.session_version !== session.sessionVersion) return res.status(401).json({ error: 'Invalid session' })
+    req.user = { id: String(user.id), email: user.email, sessionVersion: user.session_version }
+    next()
+  }).catch(next)
+}
+export function optionalAuthMiddleware(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+  const token = requestToken(req)
+  if (!token || token.length > 4096) return next()
+  let session: SessionIdentity
+  try { session = verifySession(token) } catch (error) {
+    if (error instanceof HttpError && error.status === 503) return next(error)
+    clearSessionCookie(res)
+    return next()
+  }
+  pool.query<{ id: number; email: string; session_version: number }>('SELECT id,email,session_version FROM users WHERE id=$1', [session.id]).then(result => {
+    const user = result.rows[0]
+    if (!user || user.email !== session.email || user.session_version !== session.sessionVersion) {
+      clearSessionCookie(res)
+      return next()
+    }
     req.user = { id: String(user.id), email: user.email, sessionVersion: user.session_version }
     next()
   }).catch(next)

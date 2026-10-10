@@ -30,15 +30,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const hadSession = Boolean(legacyToken || localStorage.getItem(AUTH_MARKER))
     setIsLoading(true)
     try {
-      let current: User
-      try { current = await api<User>('/api/auth/me') } catch (error) {
-        if (!(legacyToken && error instanceof ApiError && error.status === 401)) throw error
+      let response = await api<{ user: User | null }>('/api/auth/session')
+      if (!response.user && legacyToken) {
         localStorage.removeItem(TOKEN_KEY)
-        current = await api<User>('/api/auth/me')
+        response = await api<{ user: User | null }>('/api/auth/session')
       }
       if (request === generation.current) {
-        localStorage.removeItem(TOKEN_KEY); localStorage.setItem(AUTH_MARKER, '1')
-        setUser(current)
+        localStorage.removeItem(TOKEN_KEY)
+        if (response.user) localStorage.setItem(AUTH_MARKER, '1'); else localStorage.removeItem(AUTH_MARKER)
+        setUser(response.user)
+        setSessionError(!response.user && hadSession ? 'Phiên đăng nhập đã hết hạn. Hãy đăng nhập lại.' : '')
       }
     } catch (error) {
       if (request === generation.current) {

@@ -49,6 +49,10 @@ test('isolated additive migration and authenticated account state', { skip: !tes
     if (!cookie) throw new Error('Login did not return a session cookie')
     const cookieMe = await fetch(base + '/auth/me', { headers: { Cookie: cookie } })
     assert.equal(cookieMe.status, 200)
+    const cookieSession = await fetch(base + '/auth/session', { headers: { Cookie: cookie } })
+    assert.equal(cookieSession.status, 200)
+    assert.deepEqual(await cookieSession.json(), { user: identity })
+    assert.deepEqual(await (await fetch(base + '/auth/session')).json(), { user: null })
     assert.equal((await request('/me/state')).status, 401)
     assert.equal((await request('/me/preferences', 'PUT', { level: 'N4', targetLevel: 'N3', dailyMinutes: 30, furigana: true, romaji: false }, token)).status, 200)
     const entry = { id: 'original-cat', word: '猫', reading: 'ねこ', romaji: 'neko', meanings: ['mèo'], partOfSpeech: 'noun', level: 'N5', topic: 'animals', examples: [], source: { name: 'Original starter', license: 'Original' } }
