@@ -1,4 +1,20 @@
 services:
+  migrate:
+    build:
+      context: .
+      target: backend
+    command: ["node", "backend/dist/scripts/run-migrations.js"]
+    environment:
+      NODE_ENV: production
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB:-jlpt_db}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
   backend:
     build:
       context: .
@@ -12,9 +28,17 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-jlpt_db}
       JWT_SECRET: ${JWT_SECRET:?Set a random JWT_SECRET of at least 32 characters}
       CORS_ORIGIN: ${APP_ORIGIN:-http://localhost:3000}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-1}
+      LOG_REQUESTS: ${LOG_REQUESTS:-true}
     depends_on:
-      postgres:
-        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/api/health/ready').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
   frontend:
     build:
@@ -22,8 +46,16 @@ services:
       target: frontend
     environment:
       API_INTERNAL_URL: http://backend:4000
+      ENABLE_HSTS: ${ENABLE_HSTS:-false}
     ports:
       - "127.0.0.1:3000:3000"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped

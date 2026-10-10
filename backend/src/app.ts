@@ -8,12 +8,17 @@ import dictionary from './routes/dictionary'
 import content from './routes/content'
 import exams from './routes/exams'
 import ai from './routes/ai'
-import { asyncRoute, errorHandler, rateLimit } from './middleware/http'
+import { asyncRoute, errorHandler, rateLimit, requestContext, securityHeaders } from './middleware/http'
 import { HttpError, level, text } from './services/validation'
 export function createApp() {
   const app = express()
   app.disable('x-powered-by')
+  const trustProxyHops = Number(process.env.TRUST_PROXY_HOPS || 0)
+  if (!Number.isInteger(trustProxyHops) || trustProxyHops < 0 || trustProxyHops > 3) throw new Error('TRUST_PROXY_HOPS must be an integer from 0 to 3')
+  if (trustProxyHops > 0) app.set('trust proxy', trustProxyHops)
   const origins = (process.env.FRONTEND_ORIGIN || process.env.CORS_ORIGIN || 'http://localhost:3000,http://127.0.0.1:3000').split(',').map(origin => origin.trim()).filter(Boolean)
+  app.use(requestContext())
+  app.use(securityHeaders())
   app.use(cors({ origin: origins, credentials: true }))
   app.use(protectCookieRequests(origins))
   app.use(rateLimit(240))

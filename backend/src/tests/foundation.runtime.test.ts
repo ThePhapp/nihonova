@@ -16,6 +16,8 @@ test('HTTP runtime remains alive with offline DB, truthful readiness and bounded
     assert.equal(health.status, 200)
     assert.equal(health.headers.get('access-control-allow-origin'), 'http://127.0.0.1:3000')
     assert.equal(health.headers.get('access-control-allow-credentials'), 'true')
+    assert.equal(health.headers.get('x-content-type-options'), 'nosniff')
+    assert.ok(health.headers.get('x-request-id'))
     const ready = await fetch(base + '/api/health/ready')
     assert.equal(ready.status, 503)
     assert.deepEqual(await ready.json(), { error: 'Service temporarily unavailable' })
@@ -34,6 +36,7 @@ test('HTTP runtime remains alive with offline DB, truthful readiness and bounded
     for (let index = 0; index < 11; index++) limited = await fetch(base + '/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
     assert.equal(limited!.status, 429)
     assert.ok(Number(limited!.headers.get('retry-after')) > 0)
+    assert.equal(limited!.headers.get('ratelimit-remaining'), '0')
     assert.equal((await fetch(base + '/api/health')).status, 200)
   } finally {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))
