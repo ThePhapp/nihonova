@@ -19,7 +19,7 @@ test('isolated additive migration and authenticated account state', { skip: !pro
     await pool.query("INSERT INTO vocab(word,reading,meaning,jlpt_level) VALUES('独自','どくじ','preservation fixture','N3')")
     await migrate()
     await migrate()
-    assert.equal((await pool.query('SELECT count(*) FROM jlpt_schema_versions')).rows[0].count, '2')
+    assert.equal((await pool.query('SELECT count(*) FROM jlpt_schema_versions')).rows[0].count, '3')
     assert.equal((await pool.query('SELECT count(*) FROM vocab')).rows[0].count, '1')
     assert.equal((await pool.query('SELECT column_default FROM information_schema.columns WHERE table_schema=$1 AND table_name=$2 AND column_name=$3', [schema, 'exam_attempts', 'saved_answers'])).rowCount, 1)
     server = createApp().listen(0)
@@ -28,7 +28,7 @@ test('isolated additive migration and authenticated account state', { skip: !pro
     async function request(path: string, method = 'GET', body?: unknown, token?: string) {
       const response = await fetch(base + path, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) })
       const data = await response.json() as Record<string, unknown>
-      return { status: response.status, data }
+      return { status: response.status, data, headers: response.headers }
     }
     const account = { email: 'student@example.com', password: 'abcdefgh123' }
     assert.equal((await request('/auth/register', 'POST', { ...account, password: 'short' })).status, 400)
@@ -41,6 +41,10 @@ test('isolated additive migration and authenticated account state', { skip: !pro
     const identity = login.data.user as { id: string; email: string }
     assert.equal(typeof identity.id, 'string')
     assert.equal((await request('/auth/me', 'GET', undefined, token)).data.id, identity.id)
+    const cookie = login.headers.get('set-cookie')?.split(';')[0]
+    assert.ok(cookie?.startsWith('jlpt_session='))
+    const cookieMe = await fetch(base + '/auth/me', { headers: { Cookie: cookie! } })
+    assert.equal(cookieMe.status, 200)
     assert.equal((await request('/me/state')).status, 401)
     assert.equal((await request('/me/preferences', 'PUT', { level: 'N4', targetLevel: 'N3', dailyMinutes: 30, furigana: true, romaji: false }, token)).status, 200)
     const entry = { id: 'original-cat', word: '猫', reading: 'ねこ', romaji: 'neko', meanings: ['mèo'], partOfSpeech: 'noun', level: 'N5', topic: 'animals', examples: [], source: { name: 'Original starter', license: 'Original' } }

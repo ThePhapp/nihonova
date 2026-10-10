@@ -2,7 +2,7 @@ import express from 'express'
 import cors from 'cors'
 import { pool } from './config/db'
 import auth from './routes/auth'
-import { jwtSecret } from './middleware/auth'
+import { jwtSecret, protectCookieRequests } from './middleware/auth'
 import me from './routes/me'
 import dictionary from './routes/dictionary'
 import content from './routes/content'
@@ -14,7 +14,8 @@ export function createApp() {
   const app = express()
   app.disable('x-powered-by')
   const origins = (process.env.FRONTEND_ORIGIN || process.env.CORS_ORIGIN || 'http://localhost:3000,http://127.0.0.1:3000').split(',').map(origin => origin.trim()).filter(Boolean)
-  app.use(cors({ origin: origins }))
+  app.use(cors({ origin: origins, credentials: true }))
+  app.use(protectCookieRequests(origins))
   app.use(rateLimit(240))
   app.use(express.json({ limit: '32kb' }))
   app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
@@ -22,7 +23,7 @@ export function createApp() {
     jwtSecret()
     await pool.query('SELECT user_id FROM learning_profiles LIMIT 0')
     await pool.query('SELECT saved_answers FROM exam_attempts LIMIT 0')
-    await pool.query('SELECT id,email,password FROM users LIMIT 0; SELECT id,entry,due_at,interval,ease,repetitions,last_reviewed FROM learning_cards LIMIT 0; SELECT user_id,kind,item_id,minutes,completed,created_at FROM learning_activity LIMIT 0; SELECT user_id,query,created_at FROM learning_history LIMIT 0')
+    await pool.query('SELECT id,email,password,session_version FROM users LIMIT 0; SELECT id,entry,due_at,interval,ease,repetitions,last_reviewed FROM learning_cards LIMIT 0; SELECT user_id,kind,item_id,minutes,completed,created_at FROM learning_activity LIMIT 0; SELECT user_id,query,created_at FROM learning_history LIMIT 0')
     res.json({ status: 'ready' })
   }))
   app.use('/api/auth', auth)

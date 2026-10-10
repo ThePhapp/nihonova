@@ -15,6 +15,7 @@ test('HTTP runtime remains alive with offline DB, truthful readiness and bounded
     const health = await fetch(base + '/api/health', { headers: { Origin: 'http://127.0.0.1:3000' } })
     assert.equal(health.status, 200)
     assert.equal(health.headers.get('access-control-allow-origin'), 'http://127.0.0.1:3000')
+    assert.equal(health.headers.get('access-control-allow-credentials'), 'true')
     const ready = await fetch(base + '/api/health/ready')
     assert.equal(ready.status, 503)
     assert.deepEqual(await ready.json(), { error: 'Service temporarily unavailable' })
@@ -23,6 +24,8 @@ test('HTTP runtime remains alive with offline DB, truthful readiness and bounded
     assert.deepEqual(await missing.json(), { error: 'Endpoint not found' })
     const huge = await fetch(base + '/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'x'.repeat(33000) }) })
     assert.equal(huge.status, 413)
+    const blocked = await fetch(base + '/api/auth/logout', { method: 'POST', headers: { Cookie: 'jlpt_session=fake' } })
+    assert.equal(blocked.status, 403)
     delete process.env.JWT_SECRET
     const unconfigured = await fetch(base + '/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'a@example.com', password: 'abcdefgh' }) })
     assert.equal(unconfigured.status, 503)

@@ -146,4 +146,14 @@ test('account → lookup → card → SRS → exam → restored account', async 
     assert.equal(malformed.status, 400)
     assert.equal((await request('/nonexistent')).status, 404)
   })
+  await t.test('password change revokes old sessions and keeps the current session usable', async () => {
+    assert.equal((await request('/auth/password', { currentPassword: 'wrong-password', newPassword: 'Study-safer-2026!' }, owner)).status, 401)
+    const changed = await request('/auth/password', { currentPassword: 'Study-safe-2026!', newPassword: 'Study-safer-2026!' }, owner)
+    assert.equal(changed.status, 200)
+    assert.equal((await request('/auth/me', undefined, owner)).status, 401)
+    owner = changed.data.token
+    assert.equal((await request('/auth/me', undefined, owner)).status, 200)
+    assert.equal((await request('/auth/login', { email, password: 'Study-safe-2026!' })).status, 401)
+    assert.equal((await request('/auth/login', { email, password: 'Study-safer-2026!' })).status, 200)
+  })
 })

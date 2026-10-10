@@ -24,13 +24,14 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   if (options.body && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json')
   const base = (process.env.NEXT_PUBLIC_API_URL ?? '').replace(/\/$/, '')
   try {
-    const response = await fetch(`${base}${path}`, { ...options, headers, signal: controller.signal })
+    const response = await fetch(`${base}${path}`, { ...options, credentials: options.credentials ?? 'include', headers, signal: controller.signal })
     const body: unknown = response.status === 204 ? null : await response.json().catch(() => null)
     if (!response.ok) {
-      if (response.status === 401 && token && !path.startsWith('/api/auth/login') && !path.startsWith('/api/auth/register') &&
-          typeof window !== 'undefined' && localStorage.getItem(TOKEN_KEY) === token) {
-        localStorage.removeItem(TOKEN_KEY)
-        window.dispatchEvent(new Event(SESSION_EXPIRED))
+      if (response.status === 401 && !path.startsWith('/api/auth/login') && !path.startsWith('/api/auth/register') && !path.startsWith('/api/auth/me') && typeof window !== 'undefined') {
+        if (!token || localStorage.getItem(TOKEN_KEY) === token) {
+          localStorage.removeItem(TOKEN_KEY)
+          window.dispatchEvent(new Event(SESSION_EXPIRED))
+        }
       }
       const details = body && typeof body === 'object' ? body as Record<string, unknown> : {}
       throw new ApiError(typeof details.error === 'string' ? details.error : `Yêu cầu thất bại (${response.status}).`,

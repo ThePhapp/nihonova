@@ -14,6 +14,12 @@ function Settings() {
   const [minutes, setMinutes] = useState('')
   const [message, setMessage] = useState('')
   const [busy, setBusy] = useState(false)
+  const [currentPassword, setCurrentPassword] = useState('')
+  const [newPassword, setNewPassword] = useState('')
+  const [confirmation, setConfirmation] = useState('')
+  const [passwordMessage, setPasswordMessage] = useState('')
+  const [passwordError, setPasswordError] = useState('')
+  const [passwordBusy, setPasswordBusy] = useState(false)
   const initialized = useRef(false)
   const saving = useRef(false)
   useEffect(() => {
@@ -31,6 +37,20 @@ function Settings() {
       await refresh()
     } catch (failure) { setMessage(errorMessage(failure)) }
     finally { saving.current = false; setBusy(false) }
+  }
+  async function changePassword(event: FormEvent) {
+    event.preventDefault(); setPasswordMessage(''); setPasswordError('')
+    if (newPassword !== confirmation) { setPasswordError('Mật khẩu mới và phần xác nhận chưa khớp.'); return }
+    const bytes = new TextEncoder().encode(newPassword).length
+    if (bytes < 8 || bytes > 72) { setPasswordError('Mật khẩu mới cần từ 8 đến 72 byte UTF-8.'); return }
+    if (currentPassword === newPassword) { setPasswordError('Mật khẩu mới cần khác mật khẩu hiện tại.'); return }
+    setPasswordBusy(true)
+    try {
+      await api<{ success: true }>('/api/auth/password', { method: 'POST', body: JSON.stringify({ currentPassword, newPassword }) })
+      setCurrentPassword(''); setNewPassword(''); setConfirmation('')
+      setPasswordMessage('Đã đổi mật khẩu. Các phiên đăng nhập cũ trên thiết bị khác đã bị thu hồi.')
+    } catch (failure) { setPasswordError(errorMessage(failure)) }
+    finally { setPasswordBusy(false) }
   }
   if (loading && !preferences) return <p className="notice" role="status">Đang tải tùy chọn…</p>
   if (!preferences) return <div className="notice" role="alert">{error || 'Chưa tải được tùy chọn.'} <button className="btn" type="button" onClick={() => void refresh()}>Thử lại</button></div>
@@ -57,6 +77,17 @@ function Settings() {
     <section className="panel space-y-4"><h2 className="text-lg font-semibold">Giao diện trên thiết bị này</h2><p className="muted">Đang dùng chế độ {theme === 'dark' ? 'tối' : 'sáng'}.</p>
       <button type="button" className="btn" onClick={toggleTheme}>{theme === 'dark' ? 'Chuyển sang sáng' : 'Chuyển sang tối'}</button>
     </section>
+    <form className="panel space-y-4" onSubmit={changePassword} aria-busy={passwordBusy}>
+      <div><h2 className="text-lg font-semibold">Bảo mật tài khoản</h2><p className="muted mt-1">Đổi mật khẩu sẽ thu hồi các phiên cũ; phiên trên thiết bị này tiếp tục hoạt động.</p></div>
+      <fieldset className="space-y-4" disabled={passwordBusy}>
+        <div><label htmlFor="current-password">Mật khẩu hiện tại</label><input id="current-password" className="field mt-1" type="password" required autoComplete="current-password" value={currentPassword} onChange={event => setCurrentPassword(event.target.value)} /></div>
+        <div><label htmlFor="new-password">Mật khẩu mới</label><input id="new-password" className="field mt-1" type="password" required autoComplete="new-password" value={newPassword} onChange={event => setNewPassword(event.target.value)} /><p className="muted mt-1">Từ 8 đến 72 byte UTF-8.</p></div>
+        <div><label htmlFor="confirm-password">Nhập lại mật khẩu mới</label><input id="confirm-password" className="field mt-1" type="password" required autoComplete="new-password" value={confirmation} onChange={event => setConfirmation(event.target.value)} /></div>
+      </fieldset>
+      {passwordError && <p className="notice" role="alert">{passwordError}</p>}
+      {passwordMessage && <p className="notice" role="status">{passwordMessage}</p>}
+      <button type="submit" className="btn btn-primary" disabled={passwordBusy}>{passwordBusy ? 'Đang đổi…' : 'Đổi mật khẩu'}</button>
+    </form>
   </div>
 }
 export default function SettingsPage() {

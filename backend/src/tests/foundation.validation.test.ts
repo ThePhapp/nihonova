@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import jwt from 'jsonwebtoken'
-import { credentials, HttpError, integer } from '../services/validation'
+import { credentials, HttpError, integer, password } from '../services/validation'
 import { entry, preferences, statistics } from '../services/learning'
 import { verifySession } from '../middleware/auth'
 export const sampleEntry = { id: 'original-cat', word: '猫', reading: 'ねこ', romaji: 'neko', meanings: ['mèo'], partOfSpeech: 'noun', level: 'N5', topic: 'animals', examples: [], source: { name: 'Original starter', license: 'Original' } }
@@ -10,6 +10,7 @@ test('credentials normalize email and enforce UTF-8 bcrypt bounds', () => {
   for (const password of ['short', '猫'.repeat(25), 12345]) assert.throws(() => credentials({ email: 'a@example.com', password }), HttpError)
   assert.throws(() => credentials({ email: 'invalid', password: 'abcdefgh' }), HttpError)
   assert.equal(credentials({ email: 'a@example.com', password: '猫'.repeat(24) }).password.length, 24)
+  assert.equal(password('abcdefgh'), 'abcdefgh')
 })
 test('snapshot validation keeps known fields and rejects malformed nested values', () => {
   assert.deepEqual(entry({ ...sampleEntry, userId: 42 }), sampleEntry)
@@ -36,7 +37,7 @@ test('JWT rejects unsupported algorithms, missing expiry and malformed identity'
   process.env.JWT_SECRET = 'foundation-tests-only-secret-at-least-32-bytes'
   try {
     const secret = process.env.JWT_SECRET
-    assert.deepEqual(verifySession(jwt.sign({ id: '1', email: 'a@example.com' }, secret, { expiresIn: '1h' })), { id: '1', email: 'a@example.com' })
+    assert.deepEqual(verifySession(jwt.sign({ id: '1', email: 'a@example.com' }, secret, { expiresIn: '1h' })), { id: '1', email: 'a@example.com', sessionVersion: 0 })
     for (const token of [
       jwt.sign({ id: '1', email: 'a@example.com' }, secret, { algorithm: 'HS384', expiresIn: '1h' }),
       jwt.sign({ id: '1', email: 'a@example.com' }, secret),

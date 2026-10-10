@@ -25,8 +25,11 @@ export function credentials(value: unknown) {
   const body = object(value)
   const email = text(body.email, 254).trim().toLowerCase()
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new HttpError(400, 'Invalid email')
-  const password = text(body.password, 72)
-  const bytes = Buffer.byteLength(password, 'utf8')
+  return { email, password: password(body.password) }
+}
+export function password(value: unknown): string {
+  const parsed = text(value, 72)
+  const bytes = Buffer.byteLength(parsed, 'utf8')
   if (bytes < 8 || bytes > 72) throw new HttpError(400, 'Password must be 8–72 UTF-8 bytes')
-  return { email, password }
+  return parsed
 }

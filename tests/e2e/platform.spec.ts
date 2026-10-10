@@ -3,16 +3,16 @@ import { test, expect, Page } from '@playwright/test'
 async function assertFits(page: Page) {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true)
 }
-async function login(page: Page, email: string) {
+async function login(page: Page, email: string, password = 'Browser-Study-2026!') {
   await page.goto('/login')
   await page.locator('#auth-email').fill(email)
-  await page.locator('#auth-password').fill('Browser-Study-2026!')
+  await page.locator('#auth-password').fill(password)
   await page.locator('form').getByRole('button', { name: 'Đăng nhập', exact: true }).click()
   await expect(page).toHaveURL(/\/dashboard$/)
 }
 async function state(page: Page) {
   return page.evaluate(async () => {
-    const response = await fetch('/api/me/state', { headers: { Authorization: `Bearer ${localStorage.getItem('jlpt-token')}` } })
+    const response = await fetch('/api/me/state')
     if (!response.ok) throw new Error('State request failed: ' + response.status)
     return response.json()
   })
@@ -29,6 +29,7 @@ test('register, lookup, save, review, practice and restore account', async ({ pa
   await page.getByRole('button', { name: 'Tạo tài khoản', exact: true }).click()
   await expect(page).toHaveURL(/\/login\?registered=1$/)
   await login(page, email)
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('jlpt-token'))).toBeNull()
   await page.goto('/dictionary')
   await page.getByLabel('Từ khóa', { exact: true }).fill('水')
   await expect(page.locator('article').first()).toContainText('nước')
@@ -61,13 +62,25 @@ test('register, lookup, save, review, practice and restore account', async ({ pa
   await page.goto('/dashboard')
   await assertFits(page)
   await page.screenshot({ path: info.outputPath('dashboard.png'), fullPage: true })
+  const firstLogout = page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/logout')
   await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click()
+  expect((await firstLogout).status()).toBe(204)
   await expect.poll(() => page.evaluate(() => localStorage.getItem('jlpt-token'))).toBeNull()
   await login(page, email)
   const restored = await state(page)
   expect(restored.cards[0].id).toBe(saved.cards[0].id)
   expect(restored.cards[0].repetitions).toBe(saved.cards[0].repetitions)
   expect(restored.exams[0].id).toBe(saved.exams[0].id)
+  await page.goto('/settings')
+  await page.locator('#current-password').fill('Browser-Study-2026!')
+  await page.locator('#new-password').fill('Browser-Study-Safer-2026!')
+  await page.locator('#confirm-password').fill('Browser-Study-Safer-2026!')
+  await page.getByRole('button', { name: 'Đổi mật khẩu', exact: true }).click()
+  await expect(page.getByText('Các phiên đăng nhập cũ trên thiết bị khác đã bị thu hồi.', { exact: false })).toBeVisible()
+  const logout = page.waitForResponse(response => new URL(response.url()).pathname === '/api/auth/logout')
+  await page.getByRole('button', { name: 'Đăng xuất', exact: true }).click()
+  expect((await logout).status()).toBe(204)
+  await login(page, email, 'Browser-Study-Safer-2026!')
   expect(errors).toEqual([])
 })
 
