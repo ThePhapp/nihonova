@@ -6,7 +6,7 @@ import { errorText, ExamResult, jsonPost, LearningPage, LearningState, Level, Le
 import { useExamAnswers } from '@/components/learning/useExamAnswers'
 import SpeechPlayer from '@/components/learning/SpeechPlayer'
 
-type Attempt = { id: string; level: Level; expiresAt: string; questions: { id: string; skill: string; prompt: string; options: string[]; audioText?: string }[] }
+type Attempt = { id: string; level: Level; expiresAt: string; savedAnswers?: Record<string, number>; questions: { id: string; skill: string; prompt: string; options: string[]; audioText?: string }[] }
 function Result({ result }: { result: ExamResult }) {
   return <section className="panel space-y-4 p-5"><h2 className="text-2xl font-bold">Kết quả luyện tập {result.level}: {result.score}/{result.total}</h2><p className="muted">Do máy chủ chấm. Điểm này không quy đổi sang điểm chuẩn hoặc chứng nhận JLPT.</p><ul>{Object.entries(result.bySkill).map(([skill, value]) => <li key={skill}>{skill}: {value.correct}/{value.total}</li>)}</ul><ol className="space-y-3">{result.answers.map((answer, index) => <li key={answer.questionId}><p>Câu {index + 1}: {answer.correct ? 'Đúng' : 'Sai hoặc bỏ trống'} · Đáp án số {answer.correctAnswer + 1}</p><p>{answer.explanation}</p></li>)}</ol></section>
 }
@@ -18,6 +18,7 @@ export default function JlptPage() {
   const [result, setResult] = useState<ExamResult | null>(null)
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [restoring, setRestoring] = useState(false)
   const [remaining, setRemaining] = useState(0)
   const inFlight = useRef(false)
   const expiredSubmit = useRef('')
@@ -26,8 +27,18 @@ export default function JlptPage() {
   const autosave = useExamAnswers(attempt, answers)
   useEffect(() => {
     controller.current?.abort(); inFlight.current = false
-    setAttempt(null); setAnswers({}); setResult(null); setError(''); setBusy(false)
-    return () => controller.current?.abort()
+    setAttempt(null); setAnswers({}); setResult(null); setError(''); setBusy(false); setRestoring(Boolean(user))
+    if (!user) return () => controller.current?.abort()
+    const request = new AbortController(); controller.current = request; inFlight.current = true
+    void api<{ attempt: Attempt | null }>('/api/exams/active', { signal: request.signal }).then(response => {
+      if (request.signal.aborted || !response.attempt) return
+      const value = response.attempt
+      setAttempt(value); setAnswers(value.savedAnswers ?? {}); setLevel(value.level); expiredSubmit.current = ''
+      setRemaining(Math.max(0, Math.ceil((Date.parse(value.expiresAt) - Date.now()) / 1000)))
+    }).catch((reason: unknown) => { if (!request.signal.aborted) setError(errorText(reason)) }).finally(() => {
+      if (!request.signal.aborted) { inFlight.current = false; setRestoring(false) }
+    })
+    return () => request.abort()
   }, [user?.id])
   async function start() {
     if (inFlight.current) return
@@ -36,7 +47,7 @@ export default function JlptPage() {
     try {
       const value = await api<Attempt>('/api/exams/start', { ...jsonPost({ level }), signal: request.signal })
       if (request.signal.aborted) return
-      setAttempt(value); setAnswers({}); setResult(null); expiredSubmit.current = ''
+      setAttempt(value); setAnswers(value.savedAnswers ?? {}); setResult(null); setLevel(value.level); expiredSubmit.current = ''
       setRemaining(Math.max(0, Math.ceil((Date.parse(value.expiresAt) - Date.now()) / 1000)))
     } catch (reason) { if (!request.signal.aborted) setError(errorText(reason)) }
     finally { if (!request.signal.aborted) { inFlight.current = false; setBusy(false) } }
@@ -76,9 +87,10 @@ export default function JlptPage() {
   }, [attempt])
   return <LearningPage title="Luyện đề JLPT">
     {isLoading ? <p role="status">Đang kiểm tra tài khoản…</p> : !user ? <p className="notice"><Link href="/login" className="underline">Đăng nhập</Link> để bắt đầu và lưu kết quả.</p> : <>
-      <p className="notice">Đáp án được lưu tự động trước hạn. Hết giờ, máy chủ chấm bản đã lưu. Nếu mất mạng, dùng nút gửi lại. Rời trang sẽ mất đáp án chưa lưu và không thể tiếp tục lượt này tại đây.</p>
+      <p className="notice">Đáp án được lưu tự động trước hạn. Khi mở lại trang, hệ thống khôi phục lượt chưa nộp và các đáp án máy chủ đã nhận. Hết giờ, máy chủ chấm bản đã lưu.</p>
       {error && <p role="alert" className="notice">{error}</p>}
-      {!attempt && <div className="flex flex-wrap gap-4"><LevelSelect value={level} onChange={setLevel} /><button className="btn btn-primary" disabled={busy} onClick={start}>{busy ? 'Đang bắt đầu…' : 'Bắt đầu lượt luyện mới'}</button></div>}
+      {restoring && <p role="status" className="muted">Đang kiểm tra lượt luyện chưa hoàn thành…</p>}
+      {!attempt && <div className="flex flex-wrap gap-4"><LevelSelect value={level} onChange={setLevel} /><button className="btn btn-primary" disabled={busy || restoring} onClick={start}>{busy ? 'Đang bắt đầu…' : 'Bắt đầu lượt luyện mới'}</button></div>}
       {attempt && <section className="panel space-y-6 p-5">
         <h2 className="text-xl font-bold">{attempt.level} · Còn {Math.floor(remaining / 60)}:{String(remaining % 60).padStart(2, '0')}</h2>
         <p role="status">{autosave.status === 'saved' ? 'Đã lưu đáp án trên máy chủ.' : autosave.status === 'saving' ? 'Đang lưu đáp án…' : autosave.status === 'error' ? 'Chưa lưu được — kiểm tra kết nối.' : 'Chưa chọn đáp án.'}</p>

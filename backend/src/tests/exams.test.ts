@@ -39,6 +39,14 @@ function fakeDatabase(options: { owner?: string; now?: Date; saved?: Record<stri
   const sql: string[] = []
   let writes = 0
   const pool = {
+    async query(query: string, values: unknown[] = []) {
+      sql.push(query)
+      if (query.includes('result IS NULL')) {
+        if (values[0] !== (options.owner ?? '1')) return { rows: [] }
+        return { rows: [{ id, level: 'N5', questions, expires_at: attempt.expiresAt, saved_answers: savedAnswers }] }
+      }
+      return { rows: [] }
+    },
     async connect() {
       const client = {
         async query(query: string, values: unknown[] = []) {
@@ -68,6 +76,13 @@ test('ownership is in the locked query; unknown account cannot grade or save', a
   assert.equal(db.writes(), 0)
   assert.ok(db.sql.some(sql => sql.includes('user_id = $2 FOR UPDATE')))
 })
+test('active attempt is account scoped and restores validated saved answers', async () => {
+  const savedAnswers = { [questions[0].id]: questions[0].answer }
+  const db = fakeDatabase({ saved: savedAnswers })
+  assert.deepEqual({ ...(await db.store.active('1'))?.savedAnswers }, savedAnswers)
+  assert.equal(await db.store.active('2'), null)
+  assert.ok(db.sql.some(sql => sql.includes('user_id=$1') && sql.includes('result IS NULL')))
+})
 test('concurrent submissions persist exactly once and retry returns identical JSON', async () => {
   const db = fakeDatabase()
   const [first, second] = await Promise.all([db.store.submit('1', id, correct), db.store.submit('1', id, {})])
@@ -93,6 +108,7 @@ test('autosave is validated, account scoped, rejects post-submit and late change
 test('HTTP start hides all grading metadata and validates submissions and auth', async () => {
   let result: ExamResult | undefined
   const store: ExamStore = {
+    async active(user) { return user === '1' ? { ...attempt, savedAnswers: { [questions[0].id]: 0 } } : null },
     async start(_user, level, questions) { return { ...attempt, level, questions } },
     async saveAnswers(_user, _id, answers) { validateAnswers(answers, questions); return { success: true } },
     async submit(user, _id, answers) {
@@ -112,6 +128,11 @@ test('HTTP start hides all grading metadata and validates submissions and auth',
   const base = `http://127.0.0.1:${(server.address() as AddressInfo).port}/exams`
   const send = (path: string, body: unknown, user = '1', method = 'POST') => fetch(base + path, { method, headers: { 'content-type': 'application/json', ...(user ? { 'x-test-user': user } : {}) }, body: JSON.stringify(body) })
   try {
+    const active = await fetch(base + '/active', { headers: { 'x-test-user': '1' } })
+    const activeData = await active.json() as { attempt: { questions: Array<Record<string, unknown>>; savedAnswers: Record<string, number> } }
+    assert.equal(active.status, 200)
+    assert.equal(activeData.attempt.savedAnswers[questions[0].id], 0)
+    assert.ok(activeData.attempt.questions.every(question => !('answer' in question) && !('explanation' in question)))
     const start = await send('/start', { level: 'N5' })
     const data = await start.json() as { questions: Array<Record<string, unknown>> }
     assert.equal(start.status, 200)

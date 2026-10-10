@@ -17,6 +17,7 @@ export class ExamError extends Error {
   constructor(public status: number, public code: string, message: string) { super(message) }
 }
 export interface ExamStore {
+  active(userId: string): Promise<Attempt | null>
   start(userId: string, level: Level, questions: ExamQuestion[]): Promise<Attempt>
   saveAnswers(userId: string, id: string, answers: unknown): Promise<{ success: true }>
   submit(userId: string, id: string, answers: unknown): Promise<ExamResult>
@@ -55,12 +56,27 @@ export function gradeAttempt(attempt: Attempt, answers: Record<string, number>, 
 // supports ts-node-dev, where a literal dynamic import of db.js has no source file.
 export class PostgresExamStore implements ExamStore {
   constructor(private loadPool = async () => pool) {}
+  async active(userId: string): Promise<Attempt | null> {
+    const pool = await this.loadPool()
+    const found = await pool.query('SELECT id,level,questions,expires_at,saved_answers FROM exam_attempts WHERE user_id=$1 AND result IS NULL ORDER BY started_at DESC,id DESC LIMIT 1', [userId])
+    const row = found.rows[0]
+    if (!row) return null
+    const questions = row.questions as ExamQuestion[]
+    return { id: row.id, level: row.level, questions, expiresAt: new Date(row.expires_at).toISOString(), savedAnswers: validateAnswers(row.saved_answers ?? {}, questions) }
+  }
   async start(userId: string, level: Level, questions: ExamQuestion[]): Promise<Attempt> {
     const pool = await this.loadPool()
     const client = await pool.connect()
     try {
       await client.query('BEGIN')
       await client.query('SELECT pg_advisory_xact_lock($1::integer)', [userId])
+      const active = await client.query('SELECT id,level,questions,expires_at,saved_answers FROM exam_attempts WHERE user_id=$1 AND result IS NULL AND expires_at > clock_timestamp() ORDER BY started_at DESC,id DESC LIMIT 1', [userId])
+      if (active.rows[0]) {
+        const row = active.rows[0]
+        const activeQuestions = row.questions as ExamQuestion[]
+        await client.query('COMMIT')
+        return { id: row.id, level: row.level, questions: activeQuestions, expiresAt: new Date(row.expires_at).toISOString(), savedAnswers: validateAnswers(row.saved_answers ?? {}, activeQuestions) }
+      }
       const count = await client.query("SELECT COUNT(*)::integer AS count FROM exam_attempts WHERE user_id = $1 AND started_at > now() - interval '1 hour'", [userId])
       if (Number(count.rows[0].count) >= 10) throw new ExamError(429, 'EXAM_RATE_LIMIT', 'Tối đa 10 bài thi mỗi giờ.')
       const id = randomUUID()
@@ -118,9 +134,21 @@ function sameAnswers(a: Record<string, number>, b: Record<string, number>): bool
   return Object.keys(a).length === Object.keys(b).length && Object.entries(a).every(([key, value]) => b[key] === value)
 }
 
+function publicAttempt(attempt: Attempt) {
+  return { id: attempt.id, level: attempt.level, expiresAt: attempt.expiresAt, savedAnswers: attempt.savedAnswers ?? {},
+    questions: attempt.questions.map(({ id, skill, prompt, options, audioText }) => ({ id, skill, prompt, options, ...(audioText ? { audioText } : {}) })) }
+}
+
 export function createExamsRouter(store: ExamStore = new PostgresExamStore(), authenticate: RequestHandler = authMiddleware) {
   const router = Router()
   router.use(authenticate)
+  router.get('/active', async (req: AuthenticatedRequest, res) => {
+    try {
+      if (!req.user) return res.status(401).json({ error: 'Vui lòng đăng nhập.' })
+      const attempt = await store.active(String(req.user.id))
+      res.json({ attempt: attempt ? publicAttempt(attempt) : null })
+    } catch (error) { sendError(error, res) }
+  })
   router.post('/start', async (req: AuthenticatedRequest, res) => {
     try {
       if (!req.user) return res.status(401).json({ error: 'Vui lòng đăng nhập.' })
@@ -129,8 +157,7 @@ export function createExamsRouter(store: ExamStore = new PostgresExamStore(), au
       const questions = examQuestions.filter(question => question.level === level)
       if (!questions.length) throw new ExamError(503, 'EXAM_UNAVAILABLE', 'Chưa có nội dung cho cấp độ này.')
       const attempt = await store.start(String(req.user.id), level, questions)
-      res.json({ id: attempt.id, level, expiresAt: attempt.expiresAt,
-        questions: attempt.questions.map(({ id, skill, prompt, options, audioText }) => ({ id, skill, prompt, options, ...(audioText ? { audioText } : {}) })) })
+      res.json(publicAttempt(attempt))
     } catch (error) { sendError(error, res) }
   })
   router.post('/:id/submit', async (req: AuthenticatedRequest, res) => {
