@@ -21,7 +21,7 @@ export async function insertVocabulary(vocab: Vocabulary) {
 
 export async function getVocabulary(level?: string, search?: string): Promise<Vocabulary[]> {
   let query = 'SELECT * FROM vocabulary'
-  const values: any[] = []
+  const values: string[] = []
 
   if (level) {
     query += ' WHERE jlpt_level = $1'

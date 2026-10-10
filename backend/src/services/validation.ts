@@ -5,8 +5,14 @@ export function object(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new HttpError(400, 'Expected object')
   return value as Record<string, unknown>
 }
+function hasDisallowedControlCharacters(value: string): boolean {
+  return Array.from(value).some(character => {
+    const code = character.charCodeAt(0)
+    return code <= 0x08 || code === 0x0b || code === 0x0c || (code >= 0x0e && code <= 0x1f)
+  })
+}
 export function text(value: unknown, max: number, allowEmpty = false): string {
-  if (typeof value !== 'string' || value.length > max || (!allowEmpty && !value.trim()) || /[\u0000-\u0008\u000b\u000c\u000e-\u001f]/.test(value)) throw new HttpError(400, 'Invalid text')
+  if (typeof value !== 'string' || value.length > max || (!allowEmpty && !value.trim()) || hasDisallowedControlCharacters(value)) throw new HttpError(400, 'Invalid text')
   return value
 }
 export function integer(value: unknown, min: number, max: number): number {

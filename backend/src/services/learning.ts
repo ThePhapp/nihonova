@@ -61,7 +61,11 @@ export function card(row: CardRow): Card {
 }
 export function localDay(value: Date | string, timezone = process.env.APP_TIMEZONE || 'Asia/Ho_Chi_Minh'): string {
   const parts = new Intl.DateTimeFormat('en', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date(value))
-  const part = (type: string) => parts.find(value => value.type === type)!.value
+  const part = (type: string) => {
+    const found = parts.find(value => value.type === type)
+    if (!found) throw new Error('Date formatter did not return ' + type)
+    return found.value
+  }
   return part('year') + '-' + part('month') + '-' + part('day')
 }
 export function statistics(cards: Card[], activities: Activity[], exams: ExamResult[], now = new Date()) {
@@ -69,7 +73,7 @@ export function statistics(cards: Card[], activities: Activity[], exams: ExamRes
   const days = new Set(activities.filter(a => a.minutes > 0 || a.completed || a.kind === 'review').map(a => localDay(a.createdAt)))
   for (const c of cards) if (c.lastReviewed) days.add(localDay(c.lastReviewed))
   for (const exam of exams) days.add(localDay(exam.createdAt))
-  let cursor = new Date(today + 'T00:00:00.000Z'), streak = 0
+  const cursor = new Date(today + 'T00:00:00.000Z'); let streak = 0
   if (!days.has(today)) cursor.setUTCDate(cursor.getUTCDate() - 1)
   while (days.has(cursor.toISOString().slice(0, 10))) { streak++; cursor.setUTCDate(cursor.getUTCDate() - 1) }
   const total = exams.reduce((sum, exam) => sum + exam.total, 0)

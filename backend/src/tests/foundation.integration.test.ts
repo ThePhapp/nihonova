@@ -2,11 +2,13 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { Pool } from 'pg'
 import { AddressInfo } from 'node:net'
-test('isolated additive migration and authenticated account state', { skip: !process.env.TEST_DATABASE_URL }, async () => {
+const testDatabaseUrl = process.env.TEST_DATABASE_URL
+test('isolated additive migration and authenticated account state', { skip: !testDatabaseUrl }, async () => {
+  if (!testDatabaseUrl) return
   const schema = 'foundation_test_' + Date.now() + '_' + process.pid
-  const admin = new Pool({ connectionString: process.env.TEST_DATABASE_URL })
+  const admin = new Pool({ connectionString: testDatabaseUrl })
   await admin.query('CREATE SCHEMA ' + schema)
-  const url = new URL(process.env.TEST_DATABASE_URL!)
+  const url = new URL(testDatabaseUrl)
   url.searchParams.set('options', '-c search_path=' + schema)
   process.env.DATABASE_URL = url.toString()
   process.env.JWT_SECRET = 'foundation-integration-tests-only-secret-32-bytes'
@@ -22,10 +24,11 @@ test('isolated additive migration and authenticated account state', { skip: !pro
     assert.equal((await pool.query('SELECT count(*) FROM jlpt_schema_versions')).rows[0].count, '3')
     assert.equal((await pool.query('SELECT count(*) FROM vocab')).rows[0].count, '1')
     assert.equal((await pool.query('SELECT column_default FROM information_schema.columns WHERE table_schema=$1 AND table_name=$2 AND column_name=$3', [schema, 'exam_attempts', 'saved_answers'])).rowCount, 1)
-    server = createApp().listen(0)
-    await new Promise<void>(resolve => server!.once('listening', resolve))
-    const base = 'http://127.0.0.1:' + (server.address() as AddressInfo).port + '/api'
-    async function request(path: string, method = 'GET', body?: unknown, token?: string) {
+    const startedServer = createApp().listen(0)
+    server = startedServer
+    await new Promise<void>(resolve => startedServer.once('listening', resolve))
+    const base = 'http://127.0.0.1:' + (startedServer.address() as AddressInfo).port + '/api'
+    const request = async (path: string, method = 'GET', body?: unknown, token?: string) => {
       const response = await fetch(base + path, { method, headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: 'Bearer ' + token } : {}) }, body: body === undefined ? undefined : JSON.stringify(body) })
       const data = await response.json() as Record<string, unknown>
       return { status: response.status, data, headers: response.headers }
@@ -43,7 +46,8 @@ test('isolated additive migration and authenticated account state', { skip: !pro
     assert.equal((await request('/auth/me', 'GET', undefined, token)).data.id, identity.id)
     const cookie = login.headers.get('set-cookie')?.split(';')[0]
     assert.ok(cookie?.startsWith('jlpt_session='))
-    const cookieMe = await fetch(base + '/auth/me', { headers: { Cookie: cookie! } })
+    if (!cookie) throw new Error('Login did not return a session cookie')
+    const cookieMe = await fetch(base + '/auth/me', { headers: { Cookie: cookie } })
     assert.equal(cookieMe.status, 200)
     assert.equal((await request('/me/state')).status, 401)
     assert.equal((await request('/me/preferences', 'PUT', { level: 'N4', targetLevel: 'N3', dailyMinutes: 30, furigana: true, romaji: false }, token)).status, 200)
@@ -77,7 +81,9 @@ test('isolated additive migration and authenticated account state', { skip: !pro
       request('/me/cards/' + first.data.id + '/review', 'POST', { rating: 2 }, token)
     ])
     assert.deepEqual(reviews.map(value => value.status).sort(), [200, 409])
-    const reviewed = reviews.find(value => value.status === 200)!.data
+    const reviewedResponse = reviews.find(value => value.status === 200)
+    assert.ok(reviewedResponse)
+    const reviewed = reviewedResponse.data
     assert.equal(reviewed.repetitions, 1)
     assert.equal(reviewed.interval, 1)
     assert.ok(Math.abs(Date.parse(String(reviewed.lastReviewed)) - Date.now()) < 10000)
@@ -93,7 +99,10 @@ test('isolated additive migration and authenticated account state', { skip: !pro
     await pool.query('UPDATE users SET email=$1 WHERE id=$2', ['changed@example.com', identity.id])
     assert.equal((await request('/auth/me', 'GET', undefined, token)).status, 401)
   } finally {
-    if (server) await new Promise<void>((resolve, reject) => server!.close(error => error ? reject(error) : resolve()))
+    if (server) {
+      const runningServer = server
+      await new Promise<void>((resolve, reject) => runningServer.close(error => error ? reject(error) : resolve()))
+    }
     await pool.end()
     await admin.end()
   }

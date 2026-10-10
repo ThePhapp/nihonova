@@ -13,7 +13,7 @@
     "dev:frontend": "npm --prefix frontend run dev",
     "migrate": "npm --prefix backend run migrate",
     "build": "npm --prefix backend run build && npm --prefix frontend run build",
-    "lint": "eslint frontend --ext .ts,.tsx --max-warnings 0",
+    "lint": "eslint frontend backend/src --ext .ts,.tsx --max-warnings 0",
     "typecheck": "tsc -p backend/tsconfig.json --noEmit && tsc -p frontend/tsconfig.json --noEmit",
     "test": "npm --prefix backend test && node --test frontend/components/learning/useExamAnswers.test.cjs",
     "test:integration": "node --test tests/integration.test.cjs",
@@ -21,18 +21,21 @@
     "test:db": "docker compose -f infra/docker-compose.test.yml up -d --wait"
   },
   "devDependencies": {
-    "@types/pg": "^8.15.6",
-    "concurrently": "8.2.2",
-    "eslint": "8.57.1",
-    "@typescript-eslint/parser": "5.62.0",
-    "@typescript-eslint/eslint-plugin": "5.62.0",
-    "eslint-config-prettier": "8.10.0",
+    "@next/eslint-plugin-next": "^15.5.27",
     "@playwright/test": "1.64.0",
     "@tailwindcss/forms": "^0.5.10",
-    "@tailwindcss/typography": "^0.5.19"
+    "@tailwindcss/typography": "^0.5.19",
+    "@types/pg": "^8.15.6",
+    "@typescript-eslint/eslint-plugin": "5.62.0",
+    "@typescript-eslint/parser": "5.62.0",
+    "concurrently": "8.2.2",
+    "eslint": "8.57.1",
+    "eslint-config-prettier": "8.10.0"
   },
   "overrides": {
     "postcss": "8.5.29",
-    "next": { "postcss": "8.5.29" }
+    "next": {
+      "postcss": "8.5.29"
+    }
   }
 }

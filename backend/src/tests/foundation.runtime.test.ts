@@ -34,9 +34,10 @@ test('HTTP runtime remains alive with offline DB, truthful readiness and bounded
     assert.deepEqual(await unconfigured.json(), { error: 'Authentication is not configured' })
     let limited: Response | undefined
     for (let index = 0; index < 11; index++) limited = await fetch(base + '/api/auth/register', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
-    assert.equal(limited!.status, 429)
-    assert.ok(Number(limited!.headers.get('retry-after')) > 0)
-    assert.equal(limited!.headers.get('ratelimit-remaining'), '0')
+    assert.ok(limited)
+    assert.equal(limited.status, 429)
+    assert.ok(Number(limited.headers.get('retry-after')) > 0)
+    assert.equal(limited.headers.get('ratelimit-remaining'), '0')
     assert.equal((await fetch(base + '/api/health')).status, 200)
   } finally {
     await new Promise<void>((resolve, reject) => server.close(error => error ? reject(error) : resolve()))

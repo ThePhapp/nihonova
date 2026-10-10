@@ -5,12 +5,15 @@ export interface DictionaryQuery { q?: string; level?: Level; topic?: string }
 export interface DictionaryProvider {
   search(query: DictionaryQuery): { entries: DictionaryEntry[]; source: string; limited: boolean }
 }
+function hasControlCharacters(value: string): boolean {
+  return Array.from(value).some(character => character.charCodeAt(0) <= 0x1f)
+}
 
 export function normalizeSearch(value: string): string {
   return value.normalize('NFKC').toLowerCase()
     .replace(/[ァ-ヶ]/g, c => String.fromCharCode(c.charCodeAt(0) - 0x60))
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/đ/g, 'd')
-    .replace(/[\s'’\-]+/g, '').normalize('NFC')
+    .replace(/[\s'’-]+/g, '').normalize('NFC')
 }
 
 export function parseQuery(query: Record<string, unknown>): DictionaryQuery {
@@ -20,8 +23,8 @@ export function parseQuery(query: Record<string, unknown>): DictionaryQuery {
   const q = (query.q as string | undefined) ?? ''
   const topic = query.topic as string | undefined
   const level = query.level as string | undefined
-  if (q.length > 100 || /[\u0000-\u001f]/.test(q)) throw new InputError('Từ tìm kiếm tối đa 100 ký tự, không chứa ký tự điều khiển.')
-  if (topic !== undefined && (topic.length > 60 || /[\u0000-\u001f]/.test(topic))) throw new InputError('Chủ đề không hợp lệ.')
+  if (q.length > 100 || hasControlCharacters(q)) throw new InputError('Từ tìm kiếm tối đa 100 ký tự, không chứa ký tự điều khiển.')
+  if (topic !== undefined && (topic.length > 60 || hasControlCharacters(topic))) throw new InputError('Chủ đề không hợp lệ.')
   if (level !== undefined && !isLevel(level)) throw new InputError('Cấp độ phải từ N5 đến N1.')
   return { q: q.trim(), topic, level: level as Level | undefined }
 }

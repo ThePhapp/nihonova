@@ -62,7 +62,7 @@ function fakeDatabase(options: { owner?: string; now?: Date; saved?: Record<stri
           if (query.startsWith('UPDATE') && query.includes('SET saved_answers')) savedAnswers = JSON.parse(String(values[0])) as Record<string, number>
           if (query === 'COMMIT' || query === 'ROLLBACK') { locked = false; queue.shift()?.() }
           return { rows: [] }
-        }, release() {}
+        }, release() { return undefined }
       }
       return client as unknown as PoolClient
     }
