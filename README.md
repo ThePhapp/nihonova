@@ -4,10 +4,10 @@
 
 ## Chức năng đang chạy
 
-- Đăng ký/đăng nhập; dữ liệu học tách theo tài khoản và khôi phục từ PostgreSQL.
+- Đăng ký/đăng nhập bằng cookie phiên `HttpOnly`; đổi mật khẩu thu hồi các phiên cũ; dữ liệu học tách theo tài khoản và khôi phục từ PostgreSQL.
 - Tra Nhật–Việt trong bộ nội dung tự biên soạn; tùy chọn Jotoba Nhật–Anh có nguồn/giấy phép. Lịch sử, lưu từ và flashcard SRS.
 - Kanji, bảng luyện viết, ngữ pháp, bài đọc có ruby/tra từ, luyện nghe bằng giọng trình duyệt và thu âm cục bộ khi thiết bị hỗ trợ.
-- Bài luyện N5–N1: 5 kỹ năng, đồng hồ, tự lưu đáp án, chấm trên server, kết quả và lịch sử.
+- Bài luyện N5–N1: 5 kỹ năng, đồng hồ, tự lưu/khôi phục lượt chưa hoàn thành, chấm trên server, kết quả và lịch sử.
 - Dashboard dữ liệu thật, mục tiêu ngày, gợi ý kỹ năng cần ôn, cài đặt Furigana/Romaji, tìm kiếm toàn ứng dụng.
 - Adapter AI tutor phía server; báo chưa khả dụng khi chưa có API key. Không có phản hồi AI hay điểm phát âm giả.
 

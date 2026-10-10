@@ -11,13 +11,16 @@
 
 ## HTTP v1 contract
 
-Base `/api`. JSON success endpoints below return the stated shape directly (no universal envelope). Errors `{error:string, code?:string}` with appropriate 400/401/404/409/429/503 status. Dates ISO 8601, IDs strings, levels `N5|N4|N3|N2|N1`. Client fetch sends Bearer token from `jlpt-token`; server validates account ownership. JSON bodies bounded. Request validation is server-side.
+Base `/api`. JSON success endpoints below return the stated shape directly (no universal envelope). Errors `{error:string, code?:string}` with appropriate 400/401/403/404/409/429/503 status. Dates ISO 8601, IDs strings, levels `N5|N4|N3|N2|N1`. Browser requests use a same-origin `HttpOnly`, `SameSite=Strict` session cookie and `credentials: include`; unsafe cookie-authenticated requests must have an allowed `Origin`. Bearer tokens remain accepted for non-browser/API compatibility, but the browser does not persist them. The server validates account ownership. JSON bodies are bounded and request validation is server-side.
 
 ### Auth and state (T02 owner)
 
 - POST `/auth/register` `{email,password}` → 201 `{success:true}`; passwords 8–72 UTF-8 bytes, normalized email, unique constraint.
-- POST `/auth/login` `{email,password}` → `{success:true,token,user:{id,email}}`.
+- POST `/auth/login` `{email,password}` → `{success:true,token,user:{id,email}}` plus the session cookie. `token` is retained for API compatibility.
+- GET `/auth/session` → `{user:{id,email}|null}` without returning 401 for an anonymous browser; refreshes a valid cookie.
 - GET `/auth/me` → `{id,email}` authenticated.
+- POST `/auth/logout` → 204 and expires the browser cookie.
+- POST `/auth/password` `{currentPassword,newPassword}` → `{success:true,token,user}`; increments `session_version`, invalidates every older session and keeps the current browser signed in with a new cookie.
 - GET `/me/state` → `LearningState` below, defaults for new account.
 - PUT `/me/preferences` `{level,targetLevel,dailyMinutes,furigana,romaji}` → saved preferences; minutes 5–180.
 - POST `/me/cards` `{entry:DictionaryEntry}` → saved card; server validate bounded snapshot, idempotent by entry.id/account.
@@ -34,7 +37,7 @@ Activity = {kind,itemId,minutes,completed,createdAt:string}
 ExamResult = {id,level,score:number,total:number,bySkill:Record<string,{correct,total}>,createdAt:string,answers:Array<{questionId,answer:number,correctAnswer:number,correct:boolean,explanation:string}>}
 ```
 
-Expose `pool` from `backend/src/config/db.ts`; authMiddleware and AuthenticatedRequest from existing middleware. Add tables `learning_profiles(user_id primary key,preferences jsonb)`, `learning_cards(id text primary key,user_id integer,entry jsonb,due_at timestamptz,interval numeric,ease numeric,repetitions integer,last_reviewed timestamptz)`, `learning_activity(id bigserial,user_id integer,kind text,item_id text,minutes integer,completed boolean,created_at timestamptz)`, `learning_history(user_id integer,query text,created_at timestamptz)`, `exam_attempts(id text primary key,user_id integer,level text,questions jsonb,started_at timestamptz,expires_at timestamptz,result jsonb)`; FK users(id). T02 owns migrations; T07 uses exam_attempts only. Avoid altering legacy vocab data.
+Expose `pool` from `backend/src/config/db.ts`; auth middleware and `AuthenticatedRequest` from existing middleware. Add tables `learning_profiles(user_id primary key,preferences jsonb)`, `learning_cards(id text primary key,user_id integer,entry jsonb,due_at timestamptz,interval numeric,ease numeric,repetitions integer,last_reviewed timestamptz)`, `learning_activity(id bigserial,user_id integer,kind text,item_id text,minutes integer,completed boolean,created_at timestamptz)`, `learning_history(user_id integer,query text,created_at timestamptz)`, `exam_attempts(id text primary key,user_id integer,level text,questions jsonb,started_at timestamptz,expires_at timestamptz,result jsonb,saved_answers jsonb)`; FK users(id). `users.session_version` revokes older signed sessions after a password change. All schema changes use additive migrations; avoid altering legacy vocab data.
 
 ### Dictionary/content/exams/AI (T01 worker owner)
 
@@ -45,7 +48,8 @@ Expose `pool` from `backend/src/config/db.ts`; authMiddleware and AuthenticatedR
 - GET `/content/grammar?level=&q=` → `{items:Grammar[]}`; `Grammar={id,title,structure,explanation,level,examples:Array<{japanese,reading?,vietnamese}>,source}`.
 - GET `/content/reading?level=` → `{items:Reading[]}`; `Reading={id,title,level,segments:Array<{text,reading?,meaning?}>,translation,questions:Array<{prompt,options:string[],answer:number,explanation}>,source}`.
 - GET `/content/listening?level=` → `{items:Listening[]}`; `Listening={id,title,level,transcript,translation,question:{prompt,options:string[],answer:number,explanation},source}`. Browser TTS generated playback clearly labeled.
-- POST `/exams/start` `{level}` authenticated → `{id,level,expiresAt,questions:Array<{id,skill,prompt,options:string[],audioText?:string}>}`. Server keeps answers; no answer leak before submit. `audioText` is an optional browser-TTS listening script, not grading metadata.
+- GET `/exams/active` authenticated → the latest unsubmitted attempt with its validated saved answer indices, or `{attempt:null}`. The client handles an already-expired attempt by submitting only its server-saved snapshot.
+- POST `/exams/start` `{level}` authenticated → `{id,level,expiresAt,questions:Array<{id,skill,prompt,options:string[],audioText?:string}>,savedAnswers}`. Reuses the account's unexpired attempt instead of creating a duplicate. Server keeps answer keys; no grading metadata leaks before submit. `audioText` is an optional browser-TTS listening script.
 - PUT `/exams/:id/answers` `{answers:Record<string,number>}` authenticated → `{success:true}`; persist while before expiry. `exam_attempts.saved_answers jsonb NOT NULL DEFAULT '{}'` stores the last accepted snapshot. Serialize saves per attempt on client.
 - POST `/exams/:id/submit` `{answers:Record<string,number>}` authenticated → `ExamResult`; grade server-side, validate chosen indices, allow missing as incorrect; after expiry grade the server-saved snapshot only. Retry returns the same persisted result without duplicate stats.
 - GET `/ai/status` → `{available:boolean,provider:string,reason?:string}`.
@@ -53,4 +57,4 @@ Expose `pool` from `backend/src/config/db.ts`; authMiddleware and AuthenticatedR
 
 ### Frontend integration
 
-T03 creates `frontend/utils/api.ts`: `api<T>(path:string, options?:RequestInit):Promise<T>` (path includes `/api`), timeout/error checking, auth header. Export named `api`. Use existing AuthContext API. T05/07/08/09 pages wrap existing `Layout`, import named `api`, use local types until shared types are safely integrated. CSS contract from T03: `panel`, `btn`, `btn-primary`, `field`, `page-heading`, `muted`, `badge`, `notice`, `grid-cards`; accessible default HTML, responsive Tailwind utilities allowed.
+`frontend/utils/api.ts` exports `api<T>(path:string, options?:RequestInit):Promise<T>` (path includes `/api`) with timeout/error handling and cookies included. A legacy Bearer value is accepted only for one-way migration and removed from browser storage. Pages use the existing `AuthContext` and `Layout`. CSS contract: `panel`, `btn`, `btn-primary`, `field`, `page-heading`, `muted`, `badge`, `notice`, `grid-cards`; accessible default HTML and responsive Tailwind utilities are allowed.
